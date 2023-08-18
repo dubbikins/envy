@@ -52,7 +52,7 @@ type TC struct {
 }
 
 func (tc *TC) SetupTest(t *testing.T) func(tb *testing.T) {
-	log.Println("setup test case")
+
 	t.Setenv(tc.envar_key, tc.envar_value)
 	//tb.Setenv("", "")
 	tc.uut = &Test{}
