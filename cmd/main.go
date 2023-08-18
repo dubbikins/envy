@@ -1,47 +1,51 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"os"
+	"strings"
 	"time"
 
 	"github.com/dubbikins/envy"
 )
 
-type Duration struct {
-	time.Duration
+type MaxRuntime struct {
+	time.Duration ``
 }
 
-func (d *Duration) Unmarshal(f *envy.FieldReflection) (err error) {
-	ref := f.Ref().(*Duration)
-	tag, err := f.Tag()
-	if err != nil {
-		return err
-	}
-	ref.Duration, err = time.ParseDuration(tag.Value)
-	if err != nil {
-		return
-	}
-	f.Set(ref)
+func (d *MaxRuntime) UnmarshalText(value []byte) (err error) {
+	d.Duration, err = time.ParseDuration(string(value))
 	return
 }
 
+type MaxAmounts []string
+
+func (p *MaxAmounts) UnmarshalText(text []byte) error {
+	whole_str := string(text)
+	*p = strings.Split(whole_str, ",")
+	return nil
+}
+
 type Test struct {
-	Duration Duration `env:"duration;options=[5m,10m,15m]"`
+	MaxRuntime MaxRuntime `env:"duration;default=5m"`
+	MaxAmount  MaxAmounts `env:"amount;default=1,2,3"`
 }
 type Field struct {
 	Value string `env:"test"`
 }
+type Message struct {
+	Text string `json:"text"`
+	Mode string `json:"mode"`
+}
+type Readme struct {
+	Content string
+}
 
 func main() {
-	os.Setenv("test", "5s")
-	os.Setenv("struct_field", "value")
-	os.Setenv("duration", "5m")
-	test := &Test{}
-
-	err := envy.Unmarshal(test, &envy.OSEnvironmentReader{})
+	test, err := envy.New(envy.FromEnvironmentAs[Test])
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(test)
+	data, _ := json.Marshal(test)
+	fmt.Println(string(data))
 }

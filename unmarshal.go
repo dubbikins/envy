@@ -1,22 +1,11 @@
 package envy
 
-import (
-	"log"
-)
-
-type Unmarshaller interface {
-	Unmarshal(*FieldReflection) error
-	// Unmarshals() (reflect.Kind, string)
-	// Indirect()
-}
-
-func Unmarshal(s any, reader EnvironmentReader) (err error) {
+func Unmarshal(s any) (err error) {
 	var r *Reflection
-	r, err = NewReflection(s, reader)
+	r, err = NewReflection(s)
 	if err != nil {
 		return
 	}
-	log.Printf("Field Reflections: %v \n", r.Element.Fields)
 	for _, field := range r.Element.Fields {
 		err = field.Unmarshal()
 		if err != nil {
@@ -24,17 +13,5 @@ func Unmarshal(s any, reader EnvironmentReader) (err error) {
 		}
 	}
 	return err
-
 }
-
-type UnmarshallerOptions struct {
-	EnvironmentReader EnvironmentReader
-}
-
-type DefaultPrimitiveUnmarshaller struct {
-}
-
-func (u *DefaultPrimitiveUnmarshaller) Unmarshal(...EnvironmentReader) (err error) {
-
-	return
-}
+func FromEnvironmentAs[T any](t *T) error { return Unmarshal(t) }

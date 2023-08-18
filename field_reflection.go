@@ -1,20 +1,17 @@
 package envy
 
 import (
-	"log"
+	"encoding"
 	"reflect"
 )
 
 type FieldReflection struct {
 	reflect.StructField
-	Value  ValueReflection
-	Reader EnvironmentReader
+	Value ValueReflection
 }
 
-func NewFieldReflection(f reflect.StructField, v ValueReflection, reader EnvironmentReader) (fr *FieldReflection, err error) {
-	log.Printf("Creating Field Reflection: %s\n", f.Name)
-
-	fr = &FieldReflection{f, v, reader}
+func NewFieldReflection(f reflect.StructField, v ValueReflection) (fr *FieldReflection, err error) {
+	fr = &FieldReflection{f, v}
 	return
 }
 
@@ -36,18 +33,18 @@ func (field *FieldReflection) Unmarshal() (err error) {
 	if err != nil {
 		return
 	}
-	log.Printf("Unmarshalling Field: %s\n", field.Name)
-	log.Printf("Field Kind: %s\n", field.Type.Kind())
-	log.Printf("Field Name: %s\n", field.Name)
-	log.Printf("Field Value: %s\n", field.Value)
-	log.Printf("Field Interface: %s\n", field.Value.Interface())
 	if !field.Value.IsValid() {
 		return INVALID_FIELD_ERROR
 	}
+	ref := field.Value.Addr().Interface()
+	if unmarshaller, ok := ref.(encoding.TextUnmarshaler); ok {
+		return unmarshaller.UnmarshalText([]byte(tag.Value))
+	}
+	if unmarshaller, ok := ref.(encoding.BinaryUnmarshaler); ok {
+		return unmarshaller.UnmarshalBinary([]byte(tag.Value))
+	}
 	switch field.Value.Kind {
 	case reflect.Ptr:
-
-		log.Printf("Field Kind: %s\n", field.Value.Type().Elem().Kind())
 		if field.Value.IsNil() {
 			field.Value.Set(reflect.New(field.Value.Type().Elem()))
 		}
@@ -55,13 +52,10 @@ func (field *FieldReflection) Unmarshal() (err error) {
 			field.Indirect()
 			return field.Unmarshal()
 		}
-		err = Unmarshal(field.Value.Interface(), field.Reader)
+		err = Unmarshal(field.Value.Interface())
 	case reflect.Struct:
-		ref := field.Value.Addr().Interface()
-		if unmarshaller, ok := ref.(Unmarshaller); ok {
-			return unmarshaller.Unmarshal(field)
-		}
-		if err = Unmarshal(ref, field.Reader); err != nil {
+
+		if err = Unmarshal(ref); err != nil {
 			return err
 		}
 		field.Value.Set(reflect.Indirect(reflect.ValueOf(ref)))

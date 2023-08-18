@@ -1,12 +1,12 @@
 package envy
 
 import (
-	"fmt"
-	"log"
 	"reflect"
 	"strconv"
 	"strings"
 )
+
+type tag string
 
 const tagname = "env"
 
@@ -33,7 +33,7 @@ func (field *FieldReflection) Tag() (t *Tag, err error) {
 	}
 	for _, part := range parts {
 		if strings.HasPrefix(strings.TrimSpace(part), "default=") {
-			t.Default = strings.SplitN(part, "=", 2)[1]
+			t.Default = strings.Trim(strings.SplitN(part, "=", 2)[1], "\"")
 		} else if strings.HasPrefix(strings.TrimSpace(part), "options=") {
 			opts := strings.SplitN(part, "=", 2)[1]
 			opts = strings.Trim(opts, "[]")
@@ -42,7 +42,7 @@ func (field *FieldReflection) Tag() (t *Tag, err error) {
 			t.Name = part
 		}
 	}
-	t.Value = field.Reader.Getenv(t.Name)
+	t.Value = reader.Get(t.Name)
 	if t.Value == "" && t.Default != "" {
 		t.Value = t.Default
 	}
@@ -62,7 +62,6 @@ func (field *FieldReflection) Tag() (t *Tag, err error) {
 	}
 	//set the string version of the zero value if the value has no default or value set
 	zero_value := ""
-	fmt.Println(field.Type.Kind())
 	switch field.Type.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Float32, reflect.Float64:
 		zero_value = "0"
@@ -72,12 +71,6 @@ func (field *FieldReflection) Tag() (t *Tag, err error) {
 	if t.Value == "" {
 		t.Value = zero_value
 	}
-	log.Printf("Tag Name: %s\n", t.Value)
-	log.Printf("Tag Value: %s\n", t.Value)
-	log.Printf("Tag Raw Value: %s\n", t.Raw)
-	log.Printf("Tag Default: %s\n", t.Default)
-	log.Printf("Tag Required: %t\n", t.Required)
-	log.Printf("Tag Options: %v\n", t.Options)
 	return t, nil
 }
 
@@ -149,5 +142,16 @@ func UnmarshalFloat(tag *Tag, value ValueReflection) (err error) {
 	if val, err := strconv.ParseFloat(strings.ReplaceAll(tag.Value, ",", ""), bitsize); err == nil {
 		value.SetFloat(val)
 	}
+	return
+}
+
+func UnmarshalSlice(tag *Tag, field *FieldReflection) (err error) {
+	
+	values := strings.Split(tag.Value, ",")
+	reflect.MakeSlice(field.Type, 1, 1)
+	for _, v := range values {
+		strings.TrimSpace(v)
+	}
+
 	return
 }

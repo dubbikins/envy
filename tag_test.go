@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"testing"
+	"time"
 )
 
 type Test struct {
@@ -55,7 +56,7 @@ func (tc *TC) SetupTest(t *testing.T) func(tb *testing.T) {
 	t.Setenv(tc.envar_key, tc.envar_value)
 	//tb.Setenv("", "")
 	tc.uut = &Test{}
-	err := Unmarshal(tc.uut, &OSEnvironmentReader{})
+	err := Unmarshal(tc.uut)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,16 +184,40 @@ func TestAll(t *testing.T) {
 	}
 }
 
-type Test2 struct {
+type CustomTest struct {
+	DurationPos Duration `env:"custom_duration_pos"`
+	DurationNeg Duration `env:"custom_duration_neg"`
+}
 
-	// Pointer     *struct {
-	// 	Field string `env:"pointer_field"`
-	// }
-	Struct struct {
-		Field *string `env:"struct_field"`
+func TestEnvyDuration(t *testing.T) {
+	t.Setenv("custom_duration_pos", "5m")
+	var duration, err = time.ParseDuration("5m")
+	if err != nil {
+		t.Fail()
 	}
-	// MultiFieldStruct struct {
-	// 	Field1 string `env:"string"`
-	// 	Field2 string `env:"string"`
-	// }
+
+	uut := &CustomTest{}
+	Unmarshal(uut)
+	if duration.Nanoseconds() != uut.DurationPos.Nanoseconds() {
+		t.Fatalf("expected DurationPos field to equal '%s', but was '%s", duration, uut.DurationPos.Duration)
+	}
+
+}
+
+func TestEnvyDurationNegative(t *testing.T) {
+	t.Setenv("custom_duration_pos", "-5m")
+	var duration, err = time.ParseDuration("-5m")
+	if err != nil {
+		t.Fail()
+	}
+
+	uut := &CustomTest{}
+	err = Unmarshal(uut)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if duration.Nanoseconds() != uut.DurationPos.Nanoseconds() {
+		t.Fatalf("expected DurationPos field to equal '%s', but was '%s", duration, uut.DurationPos.Duration)
+	}
+
 }

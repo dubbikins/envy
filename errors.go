@@ -6,6 +6,7 @@ import (
 )
 
 var INVALID_FIELD_ERROR = errors.New("invalid field value")
+var NOT_UNMARSHALLABLE_ERROR = errors.New("field is not unmarshallable")
 
 func TagRequiredError(tagname, tag string) error {
 	return fmt.Errorf("tag unmarshal error; (%s:%s) required but not set", tagname, tag)
