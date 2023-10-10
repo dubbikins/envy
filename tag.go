@@ -1,157 +1,159 @@
 package envy
 
 import (
+	"context"
+	"encoding"
+	"fmt"
+	"os"
 	"reflect"
-	"strconv"
-	"strings"
+	"regexp"
 )
 
-type tag string
-
-const tagname = "env"
-
-type Tag struct {
-	Name     string
-	Default  string
-	Value    string
-	Raw      string
-	Options  []string
-	Required bool
+type Tag interface {
+	TagMiddleware
+	UnmarshalField(context.Context, reflect.StructField) error
 }
 
-func (field *FieldReflection) Tag() (t *Tag, err error) {
-	t = &Tag{
-		Raw: string(field.StructField.Tag.Get(tagname)),
+func zeroValueUnmarshaller(ctx context.Context, field reflect.StructField) error {
+	t, err := GetTagContext(ctx)
+	if err != nil {
+		return err
 	}
-	parts := strings.Split(t.Raw, ";")
-	if len(parts) == 0 {
-		err = TAG_VALIDATION_ERROR
-		return
-	} else if len(parts) > 4 {
-		err = INVALID_TAG_SYNTAX_ERROR
-		return
-	}
-	for _, part := range parts {
-		if strings.HasPrefix(strings.TrimSpace(part), "default=") {
-			t.Default = strings.Trim(strings.SplitN(part, "=", 2)[1], "\"")
-		} else if strings.HasPrefix(strings.TrimSpace(part), "options=") {
-			opts := strings.SplitN(part, "=", 2)[1]
-			opts = strings.Trim(opts, "[]")
-			t.Options = strings.Split(opts, ",")
-		} else {
-			t.Name = part
-		}
-	}
-	t.Value = reader.Get(t.Name)
-	if t.Value == "" && t.Default != "" {
-		t.Value = t.Default
-	}
-	if t.Options != nil {
-		matches := false
-		for _, option := range t.Options {
-			if t.Value == option {
-				matches = true
-			}
-		}
-		if !matches {
-			return t, TagInvalidOptionError(t.Name, t.Value, t.Options)
-		}
-	}
-	if t.Value == "" && t.Default == "" && t.Required {
-		return t, TagRequiredError(tagname, t.Value)
-	}
-	//set the string version of the zero value if the value has no default or value set
-	zero_value := ""
-	switch field.Type.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Float32, reflect.Float64:
-		zero_value = "0"
-	case reflect.Bool:
-		zero_value = "false"
-	}
+	//Set the zero value for fields that can't be parsed from an empty string
 	if t.Value == "" {
-		t.Value = zero_value
+		switch field.Type.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Float32, reflect.Float64:
+			t.Value = "0"
+		case reflect.Bool:
+			t.Value = "false"
+		}
 	}
-	return t, nil
+	return t.UnmarshalText(t.Bytes())
 }
 
-func UnmarshalString(tag *Tag, value ValueReflection) error {
-	value.SetString(tag.Value)
-	return nil
+// unmarshalling order
+// 1. env
+// 2. default
+// 3. options
+// 4. matches
+// 5. required
+// 6. zero values (default unmarshaller)
+func NewTag(value reflect.Value) Tag {
+	return &tag{
+		value: value,
+		tagUnmarshallers: []Middleware{
+			WithRequiredTag,
+			WithMatchesTag,
+			WithOptionsTag,
+			WithEnvTag,
+			WithDefaultTag,
+		},
+		customState:     map[string]interface{}{},
+		tagUnmarshaller: TagHandlerFunc(zeroValueUnmarshaller),
+	}
 }
 
-func UnmarshalInt(tag *Tag, value ValueReflection) (err error) {
-	var bitBase int
-	switch value.Kind {
-	case reflect.Int:
-		bitBase = 0
-	case reflect.Int8:
-		bitBase = 8
-	case reflect.Int16:
-		bitBase = 16
-	case reflect.Int32:
-		bitBase = 32
-	default:
-		bitBase = 64
+type tag struct {
+	FieldType        string
+	FieldName        string
+	value            reflect.Value
+	customState      map[string]interface{}
+	index            int
+	Name             string
+	Default          string
+	Value            string
+	Raw              string
+	Options          []string
+	Required         bool
+	Matcher          *regexp.Regexp
+	IgnoreNil        bool
+	textUnmarshaller TextUnmarshallable
+	tagUnmarshallers []Middleware
+	tagUnmarshaller  TagHandler
+}
+
+func (t *tag) UnmarshalText(text []byte) (err error) {
+	return t.textUnmarshaller.UnmarshalText(text)
+}
+func (t *tag) GetState() map[string]interface{} {
+	return t.customState
+}
+func (t *tag) GetStateValue(key string) interface{} {
+	return t.customState[key]
+}
+func (t *tag) getChainedUnmarshallers() TagHandler {
+	for len(t.tagUnmarshallers) > 0 {
+		next := t.Pop()
+
+		t.tagUnmarshaller = next(t.tagUnmarshaller)
 	}
-	if val, err := strconv.ParseInt(strings.ReplaceAll(tag.Value, ",", ""), 0, bitBase); err != nil {
-		return err
+	return t.tagUnmarshaller
+}
+func (tag *tag) UnmarshalField(ctx context.Context, field reflect.StructField) (err error) {
+	tag.FieldType = field.Type.Name()
+	tag.FieldName = field.Name
+
+	if !tag.value.IsValid() {
+		return INVALID_FIELD_ERROR
+	}
+	ref := tag.value.Addr().Interface()
+	if custom_text_unmarshaller, ok := ref.(encoding.TextUnmarshaler); ok {
+		tag.useTextUnmarshaller(custom_text_unmarshaller)
 	} else {
-		value.SetInt(val)
+		switch tag.value.Kind() {
+		case reflect.Ptr:
+			tag.useTextUnmarshaller(_pointer(tag.value))
+		case reflect.Struct:
+			tag.useTextUnmarshaller(_struct(tag.value))
+		case reflect.Slice:
+			tag.useTextUnmarshaller(_slice(tag.value))
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			tag.useTextUnmarshaller(_int(tag.value))
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			tag.useTextUnmarshaller(_uint(tag.value))
+		case reflect.String:
+			tag.useTextUnmarshaller(_string(tag.value))
+		case reflect.Bool:
+			tag.useTextUnmarshaller(_boolean(tag.value))
+		case reflect.Float32, reflect.Float64:
+			tag.useTextUnmarshaller(_float(tag.value))
+		}
 	}
+	if err = tag.getChainedUnmarshallers().UnmarshalField(WithTagContext(ctx, tag), field); err != nil {
+		return
+	}
+	err = tag.UnmarshalText(tag.Bytes())
 	return
 }
-func UnmarshalUint(tag *Tag, value ValueReflection) (err error) {
-	var bitsize int
-	switch value.Kind {
-	case reflect.Uint:
-		bitsize = 0
-	case reflect.Uint8:
-		bitsize = 8
-	case reflect.Uint16:
-		bitsize = 16
-	case reflect.Uint32:
-		bitsize = 32
-	default:
-		bitsize = 64
+func (t *tag) Bytes() []byte {
+	if t.Value == "" {
+		return []byte(t.Default)
 	}
-	if val, err := strconv.ParseUint(strings.ReplaceAll(tag.Value, ",", ""), 0, bitsize); err != nil {
-		return err
-	} else {
-		value.SetUint(val)
-	}
-	return
+	return []byte(t.Value)
 }
 
-func UnmarshalBool(tag *Tag, value ValueReflection) (err error) {
-	if val, err := strconv.ParseBool(tag.Value); err != nil {
-		return err
-	} else {
-		value.SetBool(val)
+func (t *tag) Pop() Middleware {
+	if len(t.tagUnmarshallers) == 0 {
+		return nil
 	}
-	return
+	u := t.tagUnmarshallers[0]
+	t.tagUnmarshallers = t.tagUnmarshallers[1:]
+	return u
 }
-
-func UnmarshalFloat(tag *Tag, value ValueReflection) (err error) {
-	bitsize := 0
-	switch value.Kind {
-	case reflect.Float32:
-		bitsize = 32
-	case reflect.Float64:
-		bitsize = 64
-	}
-	if val, err := strconv.ParseFloat(strings.ReplaceAll(tag.Value, ",", ""), bitsize); err == nil {
-		value.SetFloat(val)
-	}
-	return
+func (t *tag) Push(us ...Middleware) {
+	t.tagUnmarshallers = append(us, t.tagUnmarshallers...)
 }
-
-func UnmarshalSlice(tag *Tag, field *FieldReflection) (err error) {
-	
-	values := strings.Split(tag.Value, ",")
-	reflect.MakeSlice(field.Type, 1, 1)
-	for _, v := range values {
-		strings.TrimSpace(v)
-	}
-
-	return
+func (t *tag) Contents() string {
+	return fmt.Sprintf(`|*****Tag Details*****|
+   StructFieldName: %s
+   StructFieldType: %s
+   Environment Variable Name: %s
+   Aquired Value:%s
+   Set Value: %s
+   RawTag: %s
+   Required: %t
+`, t.FieldName, t.FieldType, t.Name, os.Getenv(t.Name), t.Value, t.Raw, t.Required)
+}
+func (t *tag) useTextUnmarshaller(u TextUnmarshallable) {
+	t.textUnmarshaller = u
 }
