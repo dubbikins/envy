@@ -1,6 +1,7 @@
 package envy
 
 import (
+	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -24,6 +25,7 @@ func (i _int) UnmarshalText(text []byte) (err error) {
 		bitBase = 64
 	}
 	if val, err := strconv.ParseInt(strings.ReplaceAll(string(text), ",", ""), 0, bitBase); err != nil {
+		log.Printf("error unmarshalling int[%s]: %s\n", string(text), err.Error())
 		return err
 	} else {
 		value.SetInt(val)

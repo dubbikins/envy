@@ -111,38 +111,53 @@ type defaultTestStruct struct {
 }
 
 type optionsTestStruct struct {
-	String string `env:"TEST_ENV_STR;options=[a,b,c]"`
-	Int    int    `env:"TEST_ENV_INT;options=[-1,2,3]"`
-	Int8   int8   `env:"TEST_ENV_INT8;options=[-1,2,3]"`
-	Int16  int16  `env:"TEST_ENV_INT16;options=[-1,2,3]"`
-	Int32  int32  `env:"TEST_ENV_INT32;options=[-1,2,3]"`
-	Int64  int64  `env:"TEST_ENV_INT64;options=[-1,2,3]"`
-	Uint   uint   `env:"TEST_ENV_UINT;options=[1,2,3]"`
-	Uint8  uint8  `env:"TEST_ENV_UINT8;options=[1,2,3]"`
-	Uint16 uint16 `env:"TEST_ENV_UINT16;options=[1,2,3]"`
-	Uint32 uint32 `env:"TEST_ENV_UINT32;options=[1,2,3]"`
-	Uint64 uint64 `env:"TEST_ENV_UINT64;options=[1,2,3]"`
-	Bool   bool   `env:"TEST_ENV_BOOL;options=[yes,no]"`
+	String string `env:"TEST_ENV_STR" options:"a,b,c"`
+	Int    int    `env:"TEST_ENV_INT" options:"[-1,2,3]"`
+	Int8   int8   `env:"TEST_ENV_INT8" options:"{-1,2,3}"`
+	Int16  int16  `env:"TEST_ENV_INT16" options:"(-1,2,3)"`
+	Int32  int32  `env:"TEST_ENV_INT32" options:"[-1,2,3]"`
+	Int64  int64  `env:"TEST_ENV_INT64" options:"[-1,2,3]"`
+	Uint   uint   `env:"TEST_ENV_UINT" options:"[1,2,3]"`
+	Uint8  uint8  `env:"TEST_ENV_UINT8" options:"[1,2,3]"`
+	Uint16 uint16 `env:"TEST_ENV_UINT16" options:"[1,2,3]"`
+	Uint32 uint32 `env:"TEST_ENV_UINT32" options:"[1,2,3]"`
+	Uint64 uint64 `env:"TEST_ENV_UINT64" options:"[1,2,3]"`
+	Bool   bool   `env:"TEST_ENV_BOOL" options:"[yes,no]"`
 }
 
 type requiredTestStruct struct {
-	String  string  `env:"TEST_ENV_STR;required"`
-	Int     int     `env:"TEST_ENV_INT;required"`
-	Int8    int     `env:"TEST_ENV_INT8;required"`
-	Int16   int     `env:"TEST_ENV_INT16;required"`
-	Int32   int     `env:"TEST_ENV_INT32;required"`
-	Int64   int     `env:"TEST_ENV_INT64;required"`
-	Uint    int     `env:"TEST_ENV_UINT;required"`
-	Uint8   int     `env:"TEST_ENV_UINT8;required"`
-	Uint16  int     `env:"TEST_ENV_UINT16;required"`
-	Uint32  int     `env:"TEST_ENV_UINT32;required"`
-	Uint64  int     `env:"TEST_ENV_UINT64;required"`
-	Float32 float32 `env:"TEST_ENV_FLOAT32;required"`
-	Float64 float64 `env:"TEST_ENV_FLOAT64;required"`
-	Bool    bool    `env:"TEST_ENV_BOOL;required"`
+	String  string  `env:"TEST_ENV_STR" required:"true"`
+	Int     int     `env:"TEST_ENV_INT" required:"true"`
+	Int8    int     `env:"TEST_ENV_INT8" required:"true"`
+	Int16   int     `env:"TEST_ENV_INT16" required:"true"`
+	Int32   int     `env:"TEST_ENV_INT32" required:"true"`
+	Int64   int     `env:"TEST_ENV_INT64" required:"true"`
+	Uint    int     `env:"TEST_ENV_UINT" required:"true"`
+	Uint8   int     `env:"TEST_ENV_UINT8" required:"true"`
+	Uint16  int     `env:"TEST_ENV_UINT16" required:"true"`
+	Uint32  int     `env:"TEST_ENV_UINT32" required:"true"`
+	Uint64  int     `env:"TEST_ENV_UINT64" required:"true"`
+	Float32 float32 `env:"TEST_ENV_FLOAT32" required:"true"`
+	Float64 float64 `env:"TEST_ENV_FLOAT64" required:"true"`
+	Bool    bool    `env:"TEST_ENV_BOOL" required:"true"`
 }
 
-type contextKey string
+type matches struct {
+	String  string  `env:"TEST_ENV_STR" matches:"(.*).txt"`
+	Int     int     `env:"TEST_ENV_INT" required:"true"`
+	Int8    int     `env:"TEST_ENV_INT8" required:"true"`
+	Int16   int     `env:"TEST_ENV_INT16" required:"true"`
+	Int32   int     `env:"TEST_ENV_INT32" required:"true"`
+	Int64   int     `env:"TEST_ENV_INT64" required:"true"`
+	Uint    int     `env:"TEST_ENV_UINT" required:"true"`
+	Uint8   int     `env:"TEST_ENV_UINT8" required:"true"`
+	Uint16  int     `env:"TEST_ENV_UINT16" required:"true"`
+	Uint32  int     `env:"TEST_ENV_UINT32" required:"true"`
+	Uint64  int     `env:"TEST_ENV_UINT64" required:"true"`
+	Float32 float32 `env:"TEST_ENV_FLOAT32" required:"true"`
+	Float64 float64 `env:"TEST_ENV_FLOAT64" required:"true"`
+	Bool    bool    `env:"TEST_ENV_BOOL" required:"true"`
+}
 
 var testingTKey = contextKey("__testing_T__")
 var structDefKey = contextKey("__struct_defintion__")
@@ -151,16 +166,17 @@ var testTypeKey = contextKey("__test_type__")
 func structWithFields(ctx context.Context, _type string) (context.Context, error) {
 	switch _type {
 	case "base":
-		return context.WithValue(context.WithValue(ctx, structDefKey, &testStruct{}), testTypeKey, _type), nil
+		ctx = context.WithValue(ctx, structDefKey, &testStruct{})
 	case "options":
-		return context.WithValue(ctx, structDefKey, &OSEnvironmentReader{}), nil
+		ctx = context.WithValue(ctx, structDefKey, &optionsTestStruct{})
 	case "default":
-		return context.WithValue(ctx, structDefKey, &defaultTestStruct{}), nil
+		ctx = context.WithValue(ctx, structDefKey, &defaultTestStruct{})
 	case "required":
-		return context.WithValue(ctx, structDefKey, &requiredTestStruct{}), nil
+		ctx = context.WithValue(ctx, structDefKey, &requiredTestStruct{})
 	default:
 		return ctx, errors.New("invalid type")
 	}
+	return context.WithValue(ctx, testTypeKey, _type), nil
 }
 
 func theEnvVarIsSetTo(ctx context.Context, key, value string) (context.Context, error) {
@@ -178,20 +194,31 @@ func callUnmarshal(ctx context.Context) (context.Context, error) {
 }
 
 func hasValues(ctx context.Context, expectedValues *godog.DocString) (context.Context, error) {
-	t, ok := ctx.Value(testingTKey).(*testing.T)
+	_type, ok := ctx.Value(testTypeKey).(string)
 	if !ok {
-		return ctx, errors.New("testing.T not found in context")
+		return ctx, errors.New("struct test type not found in context")
 	}
-	actual := &testStruct{}
-	expected := &testStruct{}
-	err := Unmarshal(actual)
-	if err != nil {
-		t.Log(err)
-		return ctx, err
+	var err error
+	var actual any
+	var expected any
+	switch _type {
+	case "base":
+		actual = ctx.Value(structDefKey).(*testStruct)
+		expected = &testStruct{}
+	case "options":
+		actual = ctx.Value(structDefKey).(*optionsTestStruct)
+		expected = &optionsTestStruct{}
+	case "default":
+		actual = ctx.Value(structDefKey).(*defaultTestStruct)
+		expected = &defaultTestStruct{}
+	case "required":
+		actual = ctx.Value(structDefKey).(*requiredTestStruct)
+		expected = &requiredTestStruct{}
+	default:
+		return ctx, errors.New("invalid type")
 	}
 	err = json.Unmarshal([]byte(expectedValues.Content), expected)
 	if err != nil {
-		t.Log(err)
 		return ctx, err
 	}
 	if !cmp.Equal(&actual, &expected, cmp.AllowUnexported(testStruct{})) {

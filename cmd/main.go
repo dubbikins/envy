@@ -27,8 +27,8 @@ func (p *MaxAmounts) UnmarshalText(text []byte) error {
 }
 
 type Test struct {
-	MaxRuntime MaxRuntime `env:"duration;default=5m"`
-	MaxAmount  MaxAmounts `env:"amount;default=1,2,3"`
+	MaxRuntime MaxRuntime `env:"duration" default:"5m"`
+	MaxAmount  MaxAmounts `env:"amount" default:"1,2,3"`
 	Message
 	Field
 	FieldPtr   *Field
@@ -46,14 +46,25 @@ type Readme struct {
 }
 
 type Brad struct {
-	Name string `env:"NAME;default=Brad;required;options=[Brad,bubbikins]"`
+	Name string `env:"NAME" required:"true"`
 }
 
 func main() {
-	test, err := envy.New(envy.FromEnvironmentAs[Test])
+	//test := &Brad{}
+	rm, err := envy.New(envy.FromEnvironmentAs[Brad])
+	// err := envy.Unmarshal(test, func(mw envy.TagMiddleware) {
+	// 	mw.Push(
+	// 		func(next envy.TagHandler) envy.TagHandler {
+	// 			return envy.TagHandlerFunc(func(ctx context.Context, field reflect.StructField) error {
+	// 				fmt.Println("I'm in the custom tag parser")
+
+	// 				return next.UnmarshalField(ctx, field)
+	// 			})
+	// 		})
+	// })
 	if err != nil {
 		panic(err)
 	}
-	data, _ := json.Marshal(test)
+	data, _ := json.Marshal(rm)
 	fmt.Println(string(data))
 }

@@ -5,9 +5,9 @@ import (
 	"strconv"
 )
 
-type boolean reflect.Value
+type _boolean reflect.Value
 
-func (b boolean) UnmarshalText(text []byte) (err error) {
+func (b _boolean) UnmarshalText(text []byte) (err error) {
 	var val bool
 	switch string(text) {
 	case "yes", "on":
