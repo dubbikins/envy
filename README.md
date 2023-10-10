@@ -77,7 +77,7 @@ go get -u github.com/dubbikins/envy
 
 ## Available Type Convertions :boom:
 
-   Out of the box, Envy can unmarshall most primitive go types. Check out the following table of types to which ones are supported out of the box.
+ Envy can unmarshall most primitive go types out of the box. Check out the following table of types to which ones are supported out of the box.
 
 | Type  | Valid Values| Parser|  Provided? |
 | ------ | ------ |------ | -----------: |
