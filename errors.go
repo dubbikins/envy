@@ -13,7 +13,10 @@ func TagRequiredError(tagname, tag string) error {
 }
 
 func TagInvalidOptionError(tag, value string, options []string) error {
-	return fmt.Errorf("tag error: '%s' options are %v but value is set to '%s'", tag, options, value)
+	return fmt.Errorf("tag error: '%s' options are %v but is set to '%s'", tag, options, value)
+}
+func TagDoesMatchError(tag, value string, matcher string) error {
+	return fmt.Errorf("tag error: '%s' matcher expression is %v but is set to '%s'", tag, matcher, value)
 }
 
 var TAG_VALIDATION_ERROR = errors.New("invalid field definition; no tag value or default")

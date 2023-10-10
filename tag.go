@@ -1,36 +1,50 @@
 package envy
 
 import (
+	"fmt"
+	"os"
 	"reflect"
-	"strconv"
+	"regexp"
 	"strings"
 )
 
-type tag string
+type Tags []Taggable
 
-const tagname = "env"
-
-type Tag struct {
-	Name     string
-	Default  string
-	Value    string
-	Raw      string
-	Options  []string
-	Required bool
+type Taggable interface {
+	ParseField(field reflect.StructField) error
 }
 
-func (field *FieldReflection) Tag() (t *Tag, err error) {
-	t = &Tag{
-		Raw: string(field.StructField.Tag.Get(tagname)),
+const env_tagname = "env"
+const required = "required"
+const default_tag = "default"
+const options_tagname = "options"
+const matcher = "matcher"
+
+type tag struct {
+	Name      string
+	Default   string
+	Value     string
+	Raw       string
+	Options   []string
+	Required  bool
+	Matcher   string
+	IgnoreNil bool
+}
+
+func getTag(field reflect.StructField) (t *tag, err error) {
+	t = &tag{
+		Raw: string(field.Tag.Get(env_tagname)),
 	}
-	parts := strings.Split(t.Raw, ";")
+	if t.Raw == "" {
+		return t, nil
+	}
+	parts := strings.SplitN(t.Raw, ";", 5)
 	if len(parts) == 0 {
-		err = TAG_VALIDATION_ERROR
-		return
-	} else if len(parts) > 4 {
-		err = INVALID_TAG_SYNTAX_ERROR
-		return
+		return t, TAG_VALIDATION_ERROR
+	} else if len(parts) > 5 {
+		return t, INVALID_TAG_SYNTAX_ERROR
 	}
+	t.Name = parts[0]
 	for _, part := range parts {
 		if strings.HasPrefix(strings.TrimSpace(part), "default=") {
 			t.Default = strings.Trim(strings.SplitN(part, "=", 2)[1], "\"")
@@ -38,14 +52,30 @@ func (field *FieldReflection) Tag() (t *Tag, err error) {
 			opts := strings.SplitN(part, "=", 2)[1]
 			opts = strings.Trim(opts, "[]")
 			t.Options = strings.Split(opts, ",")
-		} else {
-			t.Name = part
+		} else if strings.TrimSpace(part) == "required" {
+			t.Required = true
+		} else if strings.HasPrefix(strings.TrimSpace(part), "matcher=") {
+			t.Matcher = strings.Trim(strings.SplitN(part, "=", 2)[1], "\"")
+		} else if strings.ToLower(strings.TrimSpace(part)) == "ignorenil" {
+			t.IgnoreNil = true
 		}
 	}
-	t.Value = reader.Get(t.Name)
+
+	t.Value = os.Getenv(t.Name)
 	if t.Value == "" && t.Default != "" {
 		t.Value = t.Default
 	}
+
+	details := fmt.Sprintf(`|******************************Tag Details******************************|
+		StructField: %s
+		OS Environment: %v
+		Struct Tag Name: %s
+		Environment Variable Name: %s
+		Aquired Value:%s
+		Set Value: %s
+		RawTag: %s
+		Required: %t
+		`, field.Name, os.Environ(), env_tagname, t.Name, os.Getenv(t.Name), t.Value, t.Raw, t.Required)
 	if t.Options != nil {
 		matches := false
 		for _, option := range t.Options {
@@ -57,8 +87,19 @@ func (field *FieldReflection) Tag() (t *Tag, err error) {
 			return t, TagInvalidOptionError(t.Name, t.Value, t.Options)
 		}
 	}
+	if t.Matcher != "" {
+		matcher, err := regexp.Compile(t.Matcher)
+		if err != nil {
+			return t, err
+		}
+
+		if !matcher.Match([]byte(t.Value)) {
+			return t, TagDoesMatchError(t.Name, t.Value, t.Matcher)
+		}
+	}
+
 	if t.Value == "" && t.Default == "" && t.Required {
-		return t, TagRequiredError(tagname, t.Value)
+		return t, TagRequiredError(env_tagname, details)
 	}
 	//set the string version of the zero value if the value has no default or value set
 	zero_value := ""
@@ -71,87 +112,23 @@ func (field *FieldReflection) Tag() (t *Tag, err error) {
 	if t.Value == "" {
 		t.Value = zero_value
 	}
+
 	return t, nil
 }
 
-func UnmarshalString(tag *Tag, value ValueReflection) error {
-	value.SetString(tag.Value)
+type EnvTag struct {
+}
+
+func (tag *EnvTag) ParseField(field reflect.StructField) error {
+
 	return nil
 }
 
-func UnmarshalInt(tag *Tag, value ValueReflection) (err error) {
-	var bitBase int
-	switch value.Kind {
-	case reflect.Int:
-		bitBase = 0
-	case reflect.Int8:
-		bitBase = 8
-	case reflect.Int16:
-		bitBase = 16
-	case reflect.Int32:
-		bitBase = 32
-	default:
-		bitBase = 64
-	}
-	if val, err := strconv.ParseInt(strings.ReplaceAll(tag.Value, ",", ""), 0, bitBase); err != nil {
-		return err
-	} else {
-		value.SetInt(val)
-	}
-	return
-}
-func UnmarshalUint(tag *Tag, value ValueReflection) (err error) {
-	var bitsize int
-	switch value.Kind {
-	case reflect.Uint:
-		bitsize = 0
-	case reflect.Uint8:
-		bitsize = 8
-	case reflect.Uint16:
-		bitsize = 16
-	case reflect.Uint32:
-		bitsize = 32
-	default:
-		bitsize = 64
-	}
-	if val, err := strconv.ParseUint(strings.ReplaceAll(tag.Value, ",", ""), 0, bitsize); err != nil {
-		return err
-	} else {
-		value.SetUint(val)
-	}
-	return
+type OptionsTag struct {
+	RawStructTag string
 }
 
-func UnmarshalBool(tag *Tag, value ValueReflection) (err error) {
-	if val, err := strconv.ParseBool(tag.Value); err != nil {
-		return err
-	} else {
-		value.SetBool(val)
-	}
-	return
-}
-
-func UnmarshalFloat(tag *Tag, value ValueReflection) (err error) {
-	bitsize := 0
-	switch value.Kind {
-	case reflect.Float32:
-		bitsize = 32
-	case reflect.Float64:
-		bitsize = 64
-	}
-	if val, err := strconv.ParseFloat(strings.ReplaceAll(tag.Value, ",", ""), bitsize); err == nil {
-		value.SetFloat(val)
-	}
-	return
-}
-
-func UnmarshalSlice(tag *Tag, field *FieldReflection) (err error) {
-	
-	values := strings.Split(tag.Value, ",")
-	reflect.MakeSlice(field.Type, 1, 1)
-	for _, v := range values {
-		strings.TrimSpace(v)
-	}
-
-	return
+func (tag *OptionsTag) ParseField(field reflect.StructField) error {
+	tag.RawStructTag = string(field.Tag.Get(options_tagname))
+	return nil
 }

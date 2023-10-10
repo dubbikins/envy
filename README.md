@@ -8,19 +8,29 @@ To unmarshal an environment variable into a struct field, utilize the "env" stru
 
 
 
-
 $$
-\begin{align}
+
 &S \to \text{env:"}E\text{"} | \text{env:"}E;A\text{"}\\
-&E \to \text{a} | \text{b} | \text{c} |...| \text{Y} | \text{Z} | 0 | 1 |...| 9 | \\_\\
+&E \to \text{a} | \text{b} | \text{c} |...| \text{Y} | \text{Z} |\\ 0 | 1 |...| 9 | \\_\\
 &A \to \text{''} | ;Optional | ;Optional; | ;Optional;Optional\\
 &Options \to options=[OptionsValue]\\
 &Default \to \text{default=""}\\
 &Optional \to \text{options=}[ OptionsValue ] |  | \text{required}\\
 &OptionsValue \to \text{""}\\
-\end{align}
+
 $$
 
 
 Note: 
-- `"` is a literal character in the grammar while `'` around a string is meant to represent a literal.
+- `"` is a literal character in the grammar while `'` around a string is meant to represent a string literal.
+
+# Custom Type Unmarshalling 
+```go
+type TextUnmarshaler interface {
+    UnmarshalText(text []byte) error
+}
+//or
+type BinaryUnmarshaler interface {
+	UnmarshalBinary(data []byte) error
+}
+```

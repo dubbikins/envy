@@ -10,19 +10,20 @@ import (
 )
 
 type Test struct {
-	String      string `env:"string"`
-	Int         int    `env:"int"`
-	Int8        int    `env:"int8"`
-	Int16       int    `env:"int16"`
-	Int32       int    `env:"int32"`
-	Int64       int    `env:"int64"`
-	Uint        int    `env:"uint"`
-	Uint8       int    `env:"uint8"`
-	Uint16      int    `env:"uint16"`
-	Uint32      int    `env:"uint32"`
-	Uint64      int    `env:"uint64"`
-	Bool        bool   `env:"bool"`
-	BoolDefault bool   `env:"bool"`
+	String      string  `env:"string"`
+	StringPtr   *string `env:"string_ptr"`
+	Int         int     `env:"int"`
+	Int8        int     `env:"int8"`
+	Int16       int     `env:"int16"`
+	Int32       int     `env:"int32"`
+	Int64       int     `env:"int64"`
+	Uint        int     `env:"uint"`
+	Uint8       int     `env:"uint8"`
+	Uint16      int     `env:"uint16"`
+	Uint32      int     `env:"uint32"`
+	Uint64      int     `env:"uint64"`
+	Bool        bool    `env:"bool"`
+	BoolDefault bool    `env:"bool"`
 	Pointer     *struct {
 		Field string `env:"pointer_field"`
 	}
@@ -182,6 +183,7 @@ func TestAll(t *testing.T) {
 	for _, tc := range test_cases {
 		tc.Run(t)
 	}
+
 }
 
 type CustomTest struct {
@@ -197,15 +199,30 @@ func TestEnvyDuration(t *testing.T) {
 	}
 
 	uut := &CustomTest{}
-	Unmarshal(uut)
+	err = Unmarshal(uut)
 	if duration.Nanoseconds() != uut.DurationPos.Nanoseconds() {
 		t.Fatalf("expected DurationPos field to equal '%s', but was '%s", duration, uut.DurationPos.Duration)
 	}
 
 }
 
+func TestStructStringField(t *testing.T) {
+	type TestStringField struct {
+		String string `env:"TEST_STRING_ENV"`
+	}
+	t.Setenv("TEST_STRING_ENV", "passed")
+
+	uut := &TestStringField{}
+	err := Unmarshal(uut)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if uut.String != "passed" {
+		t.Fail()
+	}
+}
 func TestEnvyDurationNegative(t *testing.T) {
-	t.Setenv("custom_duration_pos", "-5m")
+	t.Setenv("custom_duration_neg", "-5m")
 	var duration, err = time.ParseDuration("-5m")
 	if err != nil {
 		t.Fail()
@@ -216,8 +233,8 @@ func TestEnvyDurationNegative(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	if duration.Nanoseconds() != uut.DurationPos.Nanoseconds() {
-		t.Fatalf("expected DurationPos field to equal '%s', but was '%s", duration, uut.DurationPos.Duration)
+	if duration.Nanoseconds() != uut.DurationNeg.Nanoseconds() {
+		t.Fatalf("expected DurationPos field to equal '%s', but was '%s", duration, uut.DurationNeg.Duration)
 	}
 
 }

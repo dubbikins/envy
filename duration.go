@@ -7,16 +7,10 @@ type Duration struct {
 	time.Duration
 }
 
-func (d *Duration) Unmarshal(f *FieldReflection) (err error) {
-	ref := f.Ref().(*Duration)
-	tag, err := f.Tag()
-	if err != nil {
-		return err
+func (d *Duration) UnmarshalText(data []byte) (err error) {
+	if len(data) == 0 {
+		return nil
 	}
-	ref.Duration, err = time.ParseDuration(tag.Value)
-	if err != nil {
-		return
-	}
-	f.Set(ref)
+	d.Duration, err = time.ParseDuration(string(data))
 	return
 }

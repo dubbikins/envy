@@ -29,9 +29,13 @@ func (p *MaxAmounts) UnmarshalText(text []byte) error {
 type Test struct {
 	MaxRuntime MaxRuntime `env:"duration;default=5m"`
 	MaxAmount  MaxAmounts `env:"amount;default=1,2,3"`
+	Message
+	Field
+	FieldPtr   *Field
+	unexported string
 }
 type Field struct {
-	Value string `env:"test"`
+	Value string `env:"test;required"`
 }
 type Message struct {
 	Text string `json:"text"`
@@ -39,6 +43,10 @@ type Message struct {
 }
 type Readme struct {
 	Content string
+}
+
+type Brad struct {
+	Name string `env:"NAME;default=Brad;required;options=[Brad,bubbikins]"`
 }
 
 func main() {

@@ -5,10 +5,10 @@ import (
 	"sync"
 )
 
-var reader Reader
+var reader KeyValuer
 var lock = sync.Mutex{}
 
-type Reader interface {
+type KeyValuer interface {
 	Get(string) string
 }
 
@@ -25,7 +25,7 @@ func init() {
 	lock.Unlock()
 }
 
-func UseReader(r Reader) {
+func UseReader(r KeyValuer) {
 	lock.Lock()
 	reader = r
 	lock.Unlock()
