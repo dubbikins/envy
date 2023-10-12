@@ -26,7 +26,7 @@ func WithOptionsTag(next TagHandler) TagHandler {
 			return next.UnmarshalField(ctx, field)
 		}
 		for _, option := range t.Options {
-			if t.Value == option {
+			if t.Value == option || t.Default == option {
 				return next.UnmarshalField(ctx, field)
 			}
 		}
