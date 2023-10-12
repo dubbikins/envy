@@ -14,6 +14,7 @@ func WithDefaultTag(next TagHandler) TagHandler {
 			return err
 		}
 		t.Default = string(field.Tag.Get(default_tagname))
+		t.Value = t.Default
 		return next.UnmarshalField(ctx, field)
 	})
 }

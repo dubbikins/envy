@@ -20,7 +20,7 @@ func WithRequiredTag(next TagHandler) TagHandler {
 			return next.UnmarshalField(ctx, field)
 		}
 		t.Required, err = strconv.ParseBool(required_tag)
-		if t.Value == "" && t.Default == "" && t.Required {
+		if t.Value == "" && t.Required {
 			return RequiredError(t.Name, t.Contents())
 		}
 		return next.UnmarshalField(ctx, field)
