@@ -16,10 +16,10 @@ func FromEnvironment[T any](t *T) error {
 	return Unmarshal(t)
 }
 
-func WithUnmarshalled[T any](do func(ptr T)) {
+func WithUnmarshalled[T any](do func(ptr *T)) {
 	var t *T = new(T)
 	if err := Unmarshal(t); err != nil {
 		panic(err)
 	}
-	do(*t)
+	do(t)
 }

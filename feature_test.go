@@ -406,14 +406,14 @@ func TestWithUnmarshalled(t *testing.T) {
 		Match string `env:"MATCHES" matches:"^(abc|xyz)$"`
 	}
 
-	WithUnmarshalled[Test](func(ptr Test) {
+	WithUnmarshalled[Test](func(ptr *Test) {
 		if ptr.Match != "abc" {
 			t.Fatalf("expected 'abc', got %s", ptr.Match)
 		}
 	})
+	t.Setenv("MATCHES", "xyz")
+	WithUnmarshalled[Test](func(ptr *Test) {
 
-	WithUnmarshalled[*Test](func(ptr *Test) {
-		t.Setenv("MATCHES", "xyz")
 		if ptr.Match != "xyz" {
 			t.Fatalf("expected 'xyz', got %s", ptr.Match)
 		}
