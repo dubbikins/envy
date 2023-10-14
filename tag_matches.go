@@ -15,16 +15,16 @@ func WithMatchesTag(next TagHandler) TagHandler {
 		if err != nil {
 			return err
 		}
-		rawTag := field.Tag.Get(matches_tagname)
-		if rawTag == "" {
+		match_expression := field.Tag.Get(matches_tagname)
+		if match_expression == "" {
 			return next.UnmarshalField(ctx, field)
 		}
-		if t.Matcher, err = regexp.Compile(rawTag); err != nil {
+		if t.Matcher, err = regexp.Compile(match_expression); err != nil {
 			return err
 		}
-		if !t.Matcher.Match([]byte(t.Value)) {
-			return DoesNotMatchError(t.Name, t.Value, rawTag)
+		if t.Matcher.Match([]byte(t.Value)) {
+			return next.UnmarshalField(ctx, field)
 		}
-		return InvalidOptionError(t.Value, t.Options)
+		return DoesNotMatchError(field.Name, match_expression, t.Value)
 	})
 }

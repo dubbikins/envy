@@ -16,6 +16,9 @@ func WithEnvTag(next TagHandler) TagHandler {
 		}
 		t.Name = field.Tag.Get(env_tagname)
 		t.Value = os.Getenv(t.Name)
+		if t.Value == "" {
+			t.Value = t.Default
+		}
 		return next.UnmarshalField(ctx, field)
 	})
 }

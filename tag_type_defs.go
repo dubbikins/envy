@@ -5,12 +5,6 @@ import (
 	"reflect"
 )
 
-type TagHandlerFunc func(context.Context, reflect.StructField) error
-
-func (f TagHandlerFunc) UnmarshalField(ctx context.Context, field reflect.StructField) error {
-	return f(ctx, field)
-}
-
 type Middleware func(next TagHandler) TagHandler
 
 type TagHandler interface {
@@ -19,15 +13,13 @@ type TagHandler interface {
 type TagMiddleware interface {
 	Pop() Middleware
 	Push(...Middleware)
-	Contents() string
-	GetState() map[string]interface{}
-	GetStateValue(key string) interface{}
+	Reset()
 }
 
-type TextUnmarshallable interface {
-	UnmarshalText(text []byte) error
+type TagParserFunc func(ctx context.Context, field reflect.StructField) error
+
+type TagHandlerFunc TagParserFunc
+
+func (f TagHandlerFunc) UnmarshalField(ctx context.Context, field reflect.StructField) error {
+	return f(ctx, field)
 }
-
-type UnmarshallableFunc func(text []byte) error
-
-func (f UnmarshallableFunc) UnmarshalText(text []byte) error { return f(text) }

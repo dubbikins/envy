@@ -1,6 +1,8 @@
 package envy
 
-import "reflect"
+import (
+	"reflect"
+)
 
 type _struct reflect.Value
 

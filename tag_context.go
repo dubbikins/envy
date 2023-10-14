@@ -6,6 +6,7 @@ import (
 )
 
 type contextKey string
+type ContextKey contextKey
 
 func getContextKey(key string) contextKey {
 	return contextKey(key)

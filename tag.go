@@ -39,18 +39,14 @@ func zeroValueUnmarshaller(ctx context.Context, field reflect.StructField) error
 // 5. required
 // 6. zero values (default unmarshaller)
 func NewTag(value reflect.Value) Tag {
-	return &tag{
+	t := &tag{
 		value: value,
-		tagUnmarshallers: []Middleware{
-			WithRequiredTag,
-			WithMatchesTag,
-			WithOptionsTag,
-			WithDefaultTag,
-			WithEnvTag,
-		},
+
 		customState:     map[string]interface{}{},
 		tagUnmarshaller: TagHandlerFunc(zeroValueUnmarshaller),
 	}
+	t.tagUnmarshallers = t.DefaultMiddleware()
+	return t
 }
 
 type tag struct {
@@ -67,7 +63,7 @@ type tag struct {
 	Required         bool
 	Matcher          *regexp.Regexp
 	IgnoreNil        bool
-	textUnmarshaller TextUnmarshallable
+	textUnmarshaller encoding.TextUnmarshaler
 	tagUnmarshallers []Middleware
 	tagUnmarshaller  TagHandler
 }
@@ -81,7 +77,7 @@ func (t *tag) GetState() map[string]interface{} {
 func (t *tag) GetStateValue(key string) interface{} {
 	return t.customState[key]
 }
-func (t *tag) getChainedUnmarshallers() TagHandler {
+func (t *tag) chainMiddleware() TagHandler {
 	for len(t.tagUnmarshallers) > 0 {
 		next := t.Pop()
 
@@ -119,7 +115,7 @@ func (tag *tag) UnmarshalField(ctx context.Context, field reflect.StructField) (
 			tag.useTextUnmarshaller(_float(tag.value))
 		}
 	}
-	if err = tag.getChainedUnmarshallers().UnmarshalField(WithTagContext(ctx, tag), field); err != nil {
+	if err = tag.chainMiddleware().UnmarshalField(WithTagContext(ctx, tag), field); err != nil {
 		return
 	}
 	err = tag.UnmarshalText(tag.Bytes())
@@ -140,6 +136,20 @@ func (t *tag) Pop() Middleware {
 	t.tagUnmarshallers = t.tagUnmarshallers[1:]
 	return u
 }
+func (t *tag) Reset() {
+	t.tagUnmarshallers = make([]Middleware, 0)
+}
+
+func (t *tag) DefaultMiddleware() []Middleware {
+	return []Middleware{
+		WithRequiredTag,
+		WithMatchesTag,
+		WithOptionsTag,
+		WithEnvTag,
+		WithDefaultTag,
+	}
+}
+
 func (t *tag) Push(us ...Middleware) {
 	t.tagUnmarshallers = append(us, t.tagUnmarshallers...)
 }
@@ -154,6 +164,11 @@ func (t *tag) Contents() string {
    Required: %t
 `, t.FieldName, t.FieldType, t.Name, os.Getenv(t.Name), t.Value, t.Raw, t.Required)
 }
-func (t *tag) useTextUnmarshaller(u TextUnmarshallable) {
+func (t *tag) useTextUnmarshaller(u encoding.TextUnmarshaler) {
 	t.textUnmarshaller = u
+}
+
+type TagParser interface {
+	TagName() string
+	Handler() TagHandler
 }

@@ -15,8 +15,8 @@ func RequiredError(tagname, tag_details string) error {
 func InvalidOptionError(value string, options []string) error {
 	return fmt.Errorf("tag unmarshalling error: options are [%s] but the value was set to '%s'", strings.Join(options, ","), value)
 }
-func DoesNotMatchError(tag, value string, matcher string) error {
-	return fmt.Errorf("tag error: '%s' matcher expression is %v but is set to '%s'", tag, matcher, value)
+func DoesNotMatchError(field_name, match_expression, actual string) error {
+	return fmt.Errorf("matching error:\nStruct Field: [%s]\nTrying to match expression %v but value was '%s'", field_name, match_expression, actual)
 }
 
 var TAG_VALIDATION_ERROR = errors.New("invalid field definition; no tag value or default")

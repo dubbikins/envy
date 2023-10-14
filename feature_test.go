@@ -144,7 +144,7 @@ type requiredTestStruct struct {
 
 type matches struct {
 	String  string  `env:"TEST_ENV_STR" matches:"(.*).txt"`
-	Int     int     `env:"TEST_ENV_INT" required:"true"`
+	Int     int     `env:"TEST_ENV_INT" matches:"^([0-9]*)$"`
 	Int8    int     `env:"TEST_ENV_INT8" required:"true"`
 	Int16   int     `env:"TEST_ENV_INT16" required:"true"`
 	Int32   int     `env:"TEST_ENV_INT32" required:"true"`
@@ -308,4 +308,114 @@ func TestFeatures(t *testing.T) {
 	if suite.Run() != 0 {
 		t.Fatal("non-zero status returned, failed to run feature tests")
 	}
+}
+
+func TestRequiredBasic(t *testing.T) {
+	uut := &struct {
+		Required string `env:"REQUIRED" required:"true"`
+	}{}
+	err := Unmarshal(uut)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	t.Setenv("REQUIRED", "value_set")
+	err = Unmarshal(uut)
+	if err != nil {
+		t.Fatalf("expected nil, got %v", err)
+	}
+}
+
+func TestDefaultBasic(t *testing.T) {
+	uut := &struct {
+		Default string `env:"DEFAULT" default:"default_value_set"`
+	}{}
+	err := Unmarshal(uut)
+	if err != nil {
+		t.Fatal("expected no errors")
+	}
+	if uut.Default != "default_value_set" {
+		t.Fatalf("expected 'default_value_set', got %s", uut.Default)
+	}
+	t.Setenv("DEFAULT", "default_override")
+	err = Unmarshal(uut)
+	if err != nil {
+		t.Fatalf("expected no errors, got %v", err)
+	}
+	if uut.Default != "default_override" {
+		t.Fatalf("expected 'default_override', got %s", uut.Default)
+	}
+}
+
+func TestOptionsBasic(t *testing.T) {
+	uut := &struct {
+		Option string `env:"OPTION" options:"opt1,opt2,opt3"`
+	}{}
+	err := Unmarshal(uut)
+	if err == nil {
+		t.Fatal("expected error for empty option, got nil")
+	}
+	t.Setenv("OPTION", "opt4")
+	err = Unmarshal(uut)
+	if err == nil {
+		t.Fatal("expected error for invalid option, got nil")
+	}
+	t.Setenv("OPTION", "opt1")
+	err = Unmarshal(uut)
+	if err != nil {
+		t.Fatalf("expected no errors, got %v", err)
+	}
+	if uut.Option != "opt1" {
+		t.Fatalf("expected 'opt1', got %s", uut.Option)
+	}
+}
+
+func TestMatchesBasic(t *testing.T) {
+	uut := &struct {
+		Match string `env:"MATCHES" matches:"^(abc|xyz)$"`
+	}{}
+	err := Unmarshal(uut)
+	if err == nil {
+		t.Fatal("expected error for empty value, got nil")
+	}
+	t.Setenv("MATCHES", "123")
+	err = Unmarshal(uut)
+	if err == nil {
+		t.Fatal("expected error for invalid value, got nil")
+	}
+	t.Setenv("MATCHES", "abc")
+	err = Unmarshal(uut)
+	if err != nil {
+		t.Fatalf("expected no errors, got %v", err)
+	}
+	if uut.Match != "abc" {
+		t.Fatalf("expected 'abc', got %s", uut.Match)
+	}
+	t.Setenv("MATCHES", "xyz")
+	err = Unmarshal(uut)
+	if err != nil {
+		t.Fatalf("expected no errors, got %v", err)
+	}
+	if uut.Match != "xyz" {
+		t.Fatalf("expected 'xyz', got %s", uut.Match)
+	}
+}
+
+func TestWithUnmarshalled(t *testing.T) {
+	t.Setenv("MATCHES", "abc")
+	type Test struct {
+		Match string `env:"MATCHES" matches:"^(abc|xyz)$"`
+	}
+
+	WithUnmarshalled[Test](func(ptr Test) {
+		if ptr.Match != "abc" {
+			t.Fatalf("expected 'abc', got %s", ptr.Match)
+		}
+	})
+
+	WithUnmarshalled[*Test](func(ptr *Test) {
+		t.Setenv("MATCHES", "xyz")
+		if ptr.Match != "xyz" {
+			t.Fatalf("expected 'xyz', got %s", ptr.Match)
+		}
+	})
 }

@@ -12,11 +12,14 @@ func New[T any](options ...OptionsFunc[*T]) (*T, error) {
 	return o, nil
 }
 
-func FromEnvironmentAs[T any](t *T) error {
+func FromEnvironment[T any](t *T) error {
 	return Unmarshal(t)
 }
-func FromEnvironmentWithOptionAs[T any](options ...func(tag TagMiddleware)) func(t *T) error {
-	return func(t *T) error {
-		return Unmarshal(t, options...)
+
+func WithUnmarshalled[T any](do func(ptr T)) {
+	var t *T = new(T)
+	if err := Unmarshal(t); err != nil {
+		panic(err)
 	}
+	do(*t)
 }

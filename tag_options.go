@@ -21,8 +21,6 @@ func WithOptionsTag(next TagHandler) TagHandler {
 		}
 		t.Raw += rawTag
 		if t.Options = strings.Split(strings.Trim(rawTag, "[({})]"), ","); len(t.Options) < 1 {
-			//No options were defined, so we don't need to do validations against them
-			//We can just return the next unmarshaller
 			return next.UnmarshalField(ctx, field)
 		}
 		for _, option := range t.Options {
