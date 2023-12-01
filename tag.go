@@ -19,6 +19,7 @@ func zeroValueUnmarshaller(ctx context.Context, field reflect.StructField) error
 	if err != nil {
 		return err
 	}
+	
 	//Set the zero value for fields that can't be parsed from an empty string
 	if t.Value == "" {
 		switch field.Type.Kind() {
@@ -40,12 +41,11 @@ func zeroValueUnmarshaller(ctx context.Context, field reflect.StructField) error
 // 6. zero values (default unmarshaller)
 func NewTag(value reflect.Value) Tag {
 	t := &tag{
-		value: value,
-
+		value:           value,
 		customState:     map[string]interface{}{},
 		tagUnmarshaller: TagHandlerFunc(zeroValueUnmarshaller),
 	}
-	t.tagUnmarshallers = t.DefaultMiddleware()
+	t.tagMiddleware = t.DefaultMiddleware()
 	return t
 }
 
@@ -64,7 +64,7 @@ type tag struct {
 	Matcher          *regexp.Regexp
 	IgnoreNil        bool
 	textUnmarshaller encoding.TextUnmarshaler
-	tagUnmarshallers []Middleware
+	tagMiddleware    []Middleware
 	tagUnmarshaller  TagHandler
 }
 
@@ -78,7 +78,7 @@ func (t *tag) GetStateValue(key string) interface{} {
 	return t.customState[key]
 }
 func (t *tag) chainMiddleware() TagHandler {
-	for len(t.tagUnmarshallers) > 0 {
+	for len(t.tagMiddleware) > 0 {
 		next := t.Pop()
 
 		t.tagUnmarshaller = next(t.tagUnmarshaller)
@@ -88,7 +88,6 @@ func (t *tag) chainMiddleware() TagHandler {
 func (tag *tag) UnmarshalField(ctx context.Context, field reflect.StructField) (err error) {
 	tag.FieldType = field.Type.Name()
 	tag.FieldName = field.Name
-
 	if !tag.value.IsValid() {
 		return INVALID_FIELD_ERROR
 	}
@@ -113,6 +112,10 @@ func (tag *tag) UnmarshalField(ctx context.Context, field reflect.StructField) (
 			tag.useTextUnmarshaller(_boolean(tag.value))
 		case reflect.Float32, reflect.Float64:
 			tag.useTextUnmarshaller(_float(tag.value))
+		default:
+			//If the type is not one of these values, then it's likely an interface type and cannot be set
+			//Simply return and ignore the values
+			return
 		}
 	}
 	if err = tag.chainMiddleware().UnmarshalField(WithTagContext(ctx, tag), field); err != nil {
@@ -129,15 +132,15 @@ func (t *tag) Bytes() []byte {
 }
 
 func (t *tag) Pop() Middleware {
-	if len(t.tagUnmarshallers) == 0 {
+	if len(t.tagMiddleware) == 0 {
 		return nil
 	}
-	u := t.tagUnmarshallers[0]
-	t.tagUnmarshallers = t.tagUnmarshallers[1:]
+	u := t.tagMiddleware[0]
+	t.tagMiddleware = t.tagMiddleware[1:]
 	return u
 }
 func (t *tag) Reset() {
-	t.tagUnmarshallers = make([]Middleware, 0)
+	t.tagMiddleware = make([]Middleware, 0)
 }
 
 func (t *tag) DefaultMiddleware() []Middleware {
@@ -151,7 +154,7 @@ func (t *tag) DefaultMiddleware() []Middleware {
 }
 
 func (t *tag) Push(us ...Middleware) {
-	t.tagUnmarshallers = append(us, t.tagUnmarshallers...)
+	t.tagMiddleware = append(us, t.tagMiddleware...)
 }
 func (t *tag) Contents() string {
 	return fmt.Sprintf(`|*****Tag Details*****|

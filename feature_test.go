@@ -13,6 +13,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+type i interface {
+}
 type testStruct struct {
 	unexported   string  `env:"TEST_ENV_UNEXPORTED"`
 	String       string  `env:"TEST_ENV_STR"`
@@ -58,6 +60,7 @@ type testStruct struct {
 	NestedStructPointer *struct {
 		Field string `env:"TEST_STRUCT_FIELD_PTR"`
 	}
+	Interface i
 }
 
 type TestStructWithPointer struct {
