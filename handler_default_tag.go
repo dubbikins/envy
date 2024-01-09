@@ -2,6 +2,8 @@ package envy
 
 import (
 	"context"
+	"html/template"
+	"io"
 	"reflect"
 )
 
@@ -13,7 +15,11 @@ func WithDefaultTag(next TagHandler) TagHandler {
 		if err != nil {
 			return err
 		}
-		t.Default = string(field.Tag.Get(default_tagname))
+		var tag_value = field.Tag.Get(default_tagname)
+		tmpl := template.Must(template.New("default").Parse(tag_value))
+		tmpl.Execute(t, t.Parent.Interface())
+		parsed, err := io.ReadAll(t)
+		t.Default = string(parsed)
 		return next.UnmarshalField(ctx, field)
 	})
 }

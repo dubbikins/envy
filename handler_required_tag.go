@@ -3,24 +3,15 @@ package envy
 import (
 	"context"
 	"html/template"
+	"io"
 	"reflect"
 	"strconv"
 )
-
-type Writer struct {
-	value []byte
-}
-
-func (w *Writer) Write(p []byte) (n int, err error) {
-	w.value = p
-	return len(p), nil
-}
 
 const required_tagname = "required"
 
 func WithRequiredTag(next TagHandler) TagHandler {
 	return TagHandlerFunc(func(ctx context.Context, field reflect.StructField) error {
-
 		t, err := GetTagContext(ctx)
 		if err != nil {
 			return err
@@ -30,10 +21,11 @@ func WithRequiredTag(next TagHandler) TagHandler {
 			return next.UnmarshalField(ctx, field)
 		}
 		tmpl := template.Must(template.New("required").Parse(required_tag))
-		w := &Writer{}
-		tmpl.Execute(w, t.Parent.Interface())
-		t.Required, err = strconv.ParseBool(required_tag)
-
+		tmpl.Execute(t, t.Parent.Interface())
+		parsed, err := io.ReadAll(t)
+		if t.Required, err = strconv.ParseBool(string(parsed)); err != nil {
+			return err
+		}
 		if t.Content == "" && t.Required {
 			return RequiredError(t.Name, t.Contents())
 		}

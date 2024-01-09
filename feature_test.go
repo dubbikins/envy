@@ -288,6 +288,25 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the struct should have the following values:$`, hasValues)
 	ctx.Step(`^there should be no errors$`, hasNoErrors)
 }
+
+func TestRequiredWithTemplate(t *testing.T) {
+	type TestType struct {
+		Ref             string `default:"test"`
+		Bool            bool   `default:"true" required:"{{ eq .Ref \"test\"}}"`
+		DefaultTemplate string `default:"{{.Ref}}"`
+	}
+	uut := &TestType{}
+	err := envy.Unmarshal(uut)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	if !uut.Bool {
+		t.Fail()
+	}
+	if uut.DefaultTemplate != "test" {
+		t.Fail()
+	}
+}
 func TestingTScrenarioProvider(t *testing.T) func(*godog.ScenarioContext) {
 	return func(gctx *godog.ScenarioContext) {
 		gctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {

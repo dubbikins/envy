@@ -1,6 +1,7 @@
 package envy
 
 import (
+	"bytes"
 	"context"
 	"encoding"
 	"fmt"
@@ -67,6 +68,19 @@ type Tag struct {
 	middleware  []Middleware
 	handler     TagHandler
 	Skip        bool
+	buffer      bytes.Buffer
+}
+
+func (t *Tag) Write(p []byte) (n int, err error) {
+	// w.value = p
+	// return len(p), nil
+	return t.buffer.Write(p)
+}
+
+func (t *Tag) Read(p []byte) (n int, err error) {
+	// w.value = p
+	// return len(p), nil
+	return t.buffer.Read(p)
 }
 
 func (t *Tag) UnmarshalText(text []byte) (err error) {
@@ -128,7 +142,6 @@ func (tag *Tag) UnmarshalField(ctx context.Context, field reflect.StructField) (
 		return
 	}
 	if !tag.Skip {
-
 		err = tag.UnmarshalText(tag.Bytes())
 	}
 	return
