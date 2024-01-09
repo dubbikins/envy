@@ -22,9 +22,9 @@ func WithMatchesTag(next TagHandler) TagHandler {
 		if t.Matcher, err = regexp.Compile(match_expression); err != nil {
 			return err
 		}
-		if t.Matcher.Match([]byte(t.Value)) {
+		if t.Matcher.Match([]byte(t.Content)) {
 			return next.UnmarshalField(ctx, field)
 		}
-		return DoesNotMatchError(field.Name, match_expression, t.Value)
+		return DoesNotMatchError(field.Name, match_expression, t.Content)
 	})
 }

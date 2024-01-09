@@ -1,4 +1,4 @@
-package envy
+package envy_test
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/cucumber/godog"
+	"github.com/dubbikins/envy"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -60,7 +61,8 @@ type testStruct struct {
 	NestedStructPointer *struct {
 		Field string `env:"TEST_STRUCT_FIELD_PTR"`
 	}
-	Interface i
+	Interface   i
+	SliceIgnore []string `env:"-"`
 }
 
 type TestStructWithPointer struct {
@@ -142,7 +144,7 @@ type requiredTestStruct struct {
 	Uint64  int     `env:"TEST_ENV_UINT64" required:"true"`
 	Float32 float32 `env:"TEST_ENV_FLOAT32" required:"true"`
 	Float64 float64 `env:"TEST_ENV_FLOAT64" required:"true"`
-	Bool    bool    `env:"TEST_ENV_BOOL" required:"true"`
+	Bool    bool    `env:"TEST_ENV_BOOL" required:"{{eq .String 'test'}}"`
 }
 
 type matches struct {
@@ -162,9 +164,14 @@ type matches struct {
 	Bool    bool    `env:"TEST_ENV_BOOL" required:"true"`
 }
 
-var testingTKey = contextKey("__testing_T__")
-var structDefKey = contextKey("__struct_defintion__")
-var testTypeKey = contextKey("__test_type__")
+type Reference struct {
+	Name                      string `env:"TEST_ENV_STRING" default:"not_test"`
+	RequiredIfNoneDefaultName bool   `env:"TEST_ENV_BOOL" required:"{{eq .Name 'test'}}"`
+}
+
+var testingTKey = envy.ContextKey("__testing_T__")
+var structDefKey = envy.ContextKey("__struct_defintion__")
+var testTypeKey = envy.ContextKey("__test_type__")
 
 func structWithFields(ctx context.Context, _type string) (context.Context, error) {
 	switch _type {
@@ -193,7 +200,7 @@ func theEnvVarIsSetTo(ctx context.Context, key, value string) (context.Context, 
 }
 
 func callUnmarshal(ctx context.Context) (context.Context, error) {
-	return ctx, Unmarshal(ctx.Value(structDefKey).(*testStruct))
+	return ctx, envy.Unmarshal(ctx.Value(structDefKey).(*testStruct))
 }
 
 func hasValues(ctx context.Context, expectedValues *godog.DocString) (context.Context, error) {
@@ -317,12 +324,12 @@ func TestRequiredBasic(t *testing.T) {
 	uut := &struct {
 		Required string `env:"REQUIRED" required:"true"`
 	}{}
-	err := Unmarshal(uut)
+	err := envy.Unmarshal(uut)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	t.Setenv("REQUIRED", "value_set")
-	err = Unmarshal(uut)
+	err = envy.Unmarshal(uut)
 	if err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
@@ -332,7 +339,7 @@ func TestDefaultBasic(t *testing.T) {
 	uut := &struct {
 		Default string `env:"DEFAULT" default:"default_value_set"`
 	}{}
-	err := Unmarshal(uut)
+	err := envy.Unmarshal(uut)
 	if err != nil {
 		t.Fatal("expected no errors")
 	}
@@ -340,7 +347,7 @@ func TestDefaultBasic(t *testing.T) {
 		t.Fatalf("expected 'default_value_set', got %s", uut.Default)
 	}
 	t.Setenv("DEFAULT", "default_override")
-	err = Unmarshal(uut)
+	err = envy.Unmarshal(uut)
 	if err != nil {
 		t.Fatalf("expected no errors, got %v", err)
 	}
@@ -353,17 +360,17 @@ func TestOptionsBasic(t *testing.T) {
 	uut := &struct {
 		Option string `env:"OPTION" options:"opt1,opt2,opt3"`
 	}{}
-	err := Unmarshal(uut)
+	err := envy.Unmarshal(uut)
 	if err == nil {
 		t.Fatal("expected error for empty option, got nil")
 	}
 	t.Setenv("OPTION", "opt4")
-	err = Unmarshal(uut)
+	err = envy.Unmarshal(uut)
 	if err == nil {
 		t.Fatal("expected error for invalid option, got nil")
 	}
 	t.Setenv("OPTION", "opt1")
-	err = Unmarshal(uut)
+	err = envy.Unmarshal(uut)
 	if err != nil {
 		t.Fatalf("expected no errors, got %v", err)
 	}
@@ -376,17 +383,17 @@ func TestMatchesBasic(t *testing.T) {
 	uut := &struct {
 		Match string `env:"MATCHES" matches:"^(abc|xyz)$"`
 	}{}
-	err := Unmarshal(uut)
+	err := envy.Unmarshal(uut)
 	if err == nil {
 		t.Fatal("expected error for empty value, got nil")
 	}
 	t.Setenv("MATCHES", "123")
-	err = Unmarshal(uut)
+	err = envy.Unmarshal(uut)
 	if err == nil {
 		t.Fatal("expected error for invalid value, got nil")
 	}
 	t.Setenv("MATCHES", "abc")
-	err = Unmarshal(uut)
+	err = envy.Unmarshal(uut)
 	if err != nil {
 		t.Fatalf("expected no errors, got %v", err)
 	}
@@ -394,31 +401,11 @@ func TestMatchesBasic(t *testing.T) {
 		t.Fatalf("expected 'abc', got %s", uut.Match)
 	}
 	t.Setenv("MATCHES", "xyz")
-	err = Unmarshal(uut)
+	err = envy.Unmarshal(uut)
 	if err != nil {
 		t.Fatalf("expected no errors, got %v", err)
 	}
 	if uut.Match != "xyz" {
 		t.Fatalf("expected 'xyz', got %s", uut.Match)
 	}
-}
-
-func TestWithUnmarshalled(t *testing.T) {
-	t.Setenv("MATCHES", "abc")
-	type Test struct {
-		Match string `env:"MATCHES" matches:"^(abc|xyz)$"`
-	}
-
-	WithUnmarshalled[Test](func(ptr *Test) {
-		if ptr.Match != "abc" {
-			t.Fatalf("expected 'abc', got %s", ptr.Match)
-		}
-	})
-	t.Setenv("MATCHES", "xyz")
-	WithUnmarshalled[Test](func(ptr *Test) {
-
-		if ptr.Match != "xyz" {
-			t.Fatalf("expected 'xyz', got %s", ptr.Match)
-		}
-	})
 }

@@ -24,10 +24,10 @@ func WithOptionsTag(next TagHandler) TagHandler {
 			return next.UnmarshalField(ctx, field)
 		}
 		for _, option := range t.Options {
-			if t.Value == option {
+			if t.Content == option {
 				return next.UnmarshalField(ctx, field)
 			}
 		}
-		return InvalidOptionError(t.Value, t.Options)
+		return InvalidOptionError(t.Content, t.Options)
 	})
 }

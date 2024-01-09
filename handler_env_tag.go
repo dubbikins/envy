@@ -15,9 +15,13 @@ func WithEnvTag(next TagHandler) TagHandler {
 			return err
 		}
 		t.Name = field.Tag.Get(env_tagname)
-		t.Value = os.Getenv(t.Name)
-		if t.Value == "" {
-			t.Value = t.Default
+		if t.Name == "-" {
+			t.Skip = true
+			return nil
+		}
+		t.Content = os.Getenv(t.Name)
+		if t.Content == "" {
+			t.Content = t.Default
 		}
 		return next.UnmarshalField(ctx, field)
 	})
