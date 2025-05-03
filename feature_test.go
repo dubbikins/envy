@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"reflect"
 	"testing"
@@ -16,6 +17,55 @@ import (
 
 type i interface {
 }
+
+type testStructNoOverride struct {
+	String       string  `env:"TEST_ENV_STR" envy:"@OverrideValues=false"`
+	StringPtr    string  `env:"TEST_ENV_STR_PTR"`
+	IntPtr       int     `env:"TEST_ENV_INT_PTR"`
+	IntMin       int     `env:"TEST_ENV_INT_MIN"`
+	Int8Min      int8    `env:"TEST_ENV_INT8_MIN"`
+	Int16Min     int16   `env:"TEST_ENV_INT16_MIN"`
+	Int32Min     int32   `env:"TEST_ENV_INT32_MIN"`
+	Int64Min     int64   `env:"TEST_ENV_INT64_MIN"`
+	IntMax       int     `env:"TEST_ENV_INT_MAX"`
+	Int8Max      int8    `env:"TEST_ENV_INT8_MAX"`
+	Int16Max     int16   `env:"TEST_ENV_INT16_MAX"`
+	Int32Max     int32   `env:"TEST_ENV_INT32_MAX"`
+	Int64Max     int64   `env:"TEST_ENV_INT64_MAX"`
+	UintMin      uint    `env:"TEST_ENV_UINT_MIN"`
+	Uint8Min     uint8   `env:"TEST_ENV_UINT8_MIN"`
+	Uint16Min    uint16  `env:"TEST_ENV_UINT16_MIN"`
+	Uint32Min    uint32  `env:"TEST_ENV_UINT32_MIN"`
+	Uint64Min    uint64  `env:"TEST_ENV_UINT64_MIN"`
+	UintMax      uint    `env:"TEST_ENV_UINT_MAX"`
+	Uint8Max     uint8   `env:"TEST_ENV_UINT8_MAX"`
+	Uint16Max    uint16  `env:"TEST_ENV_UINT16_MAX"`
+	Uint32Max    uint32  `env:"TEST_ENV_UINT32_MAX"`
+	Uint64Max    uint64  `env:"TEST_ENV_UINT64_MAX"`
+	Float32Min   float32 `env:"TEST_ENV_FLOAT32_MIN"`
+	Float64Min   float64 `env:"TEST_ENV_FLOAT64_MIN"`
+	Float32Max   float32 `env:"TEST_ENV_FLOAT32_MAX"`
+	Float64Max   float64 `env:"TEST_ENV_FLOAT64_MAX"`
+	BoolTrue     bool    `env:"TEST_ENV_BOOL_TRUE"`
+	BoolFalse    bool    `env:"TEST_ENV_BOOL_False"`
+	BoolPtrTrue  bool    `env:"TEST_ENV_BOOL_PTR_TRUE"`
+	BoolPtrFalse bool    `env:"TEST_ENV_BOOL_PTR_FALSE"`
+	BoolYes      bool    `env:"TEST_ENV_BOOL_YES"`
+	BoolNo       bool    `env:"TEST_ENV_BOOL_NO"`
+	BoolOn       bool    `env:"TEST_ENV_BOOL_ON"`
+	BoolOff      bool    `env:"TEST_ENV_BOOL_OFF"`
+	Bool1        bool    `env:"TEST_ENV_BOOL_1"`
+	Bool0        bool    `env:"TEST_ENV_BOOL_0"`
+	NestedStruct struct {
+		Field string `env:"TEST_STRUCT_FIELD"`
+	}
+	NestedStructPointer *struct {
+		Field string `env:"TEST_STRUCT_FIELD_PTR"`
+	}
+	Interface   i
+	SliceIgnore []string `env:"-"`
+}
+
 type testStruct struct {
 	unexported   string  `env:"TEST_ENV_UNEXPORTED"`
 	String       string  `env:"TEST_ENV_STR"`
@@ -356,7 +406,7 @@ func TestRequiredBasic(t *testing.T) {
 
 func TestDefaultBasic(t *testing.T) {
 	uut := &struct {
-		Default string `env:"DEFAULT" default:"default_value_set"`
+		Default string `env:"DEFAULT" default:"default_value_set" envy:"@OverrideValues=true"`
 	}{}
 	err := envy.Unmarshal(uut)
 	if err != nil {
@@ -400,7 +450,7 @@ func TestOptionsBasic(t *testing.T) {
 
 func TestMatchesBasic(t *testing.T) {
 	uut := &struct {
-		Match string `env:"MATCHES" matches:"^(abc|xyz)$"`
+		Match string `env:"MATCHES" matches:"^(abc|xyz)$" envy:"@OverrideValues=true"`
 	}{}
 	err := envy.Unmarshal(uut)
 	if err == nil {
@@ -419,6 +469,7 @@ func TestMatchesBasic(t *testing.T) {
 	if uut.Match != "abc" {
 		t.Fatalf("expected 'abc', got %s", uut.Match)
 	}
+
 	t.Setenv("MATCHES", "xyz")
 	err = envy.Unmarshal(uut)
 	if err != nil {
@@ -426,5 +477,29 @@ func TestMatchesBasic(t *testing.T) {
 	}
 	if uut.Match != "xyz" {
 		t.Fatalf("expected 'xyz', got %s", uut.Match)
+	}
+}
+
+
+func TestNoOverrideOptionSet(t *testing.T) {
+	slog.Debug("testing no override option")
+	slog.SetLogLoggerLevel(slog.LevelDebug)
+	// os.Setenv("ENVY_OVERRIDE_VALUES", "false")
+	a := &testStructNoOverride{
+		String:    "test",
+	}
+	err := envy.Unmarshal(a)
+	if err != nil {
+		t.Fatalf("expected no errors, got %v", err)
+	}
+	if a.String != "test" {
+		t.Fatalf("expected 'test', got %q", a.String)
+	}
+	if a.IntMin != 0 {
+		t.Fatalf("expected 0, got %d", a.IntMin)
+	}
+	err = envy.Unmarshal(a)
+	if err != nil {
+		t.Fatalf("expected no errors, got %v", err)
 	}
 }

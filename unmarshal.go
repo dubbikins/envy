@@ -6,6 +6,8 @@ import (
 	"reflect"
 )
 
+
+
 func Unmarshal(s any, options ...func(*Options)) (err error) {
 	if reflect.TypeOf(s).Kind() != reflect.Pointer {
 		return errors.New("unmarshalling reflection error: value passed to Unmarshal must be a struct pointer type")
@@ -21,8 +23,11 @@ func Unmarshal(s any, options ...func(*Options)) (err error) {
 		// var tag *tag
 		field := element.Field(i)
 		if field.IsExported() {
+			var tag *Tag
 			value := reflect.ValueOf(s).Elem().Field(i)
-			tag, err := NewTag(value, parent_value)
+			if tag, err = NewTag(value, parent_value); err != nil {
+				return err
+			}
 			if err = tag.UnmarshalField(ctx, field); err != nil {
 				return err
 			}

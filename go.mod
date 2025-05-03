@@ -1,6 +1,6 @@
 module github.com/dubbikins/envy
 
-go 1.20
+go 1.24
 
 require (
 	github.com/cucumber/godog v0.13.0

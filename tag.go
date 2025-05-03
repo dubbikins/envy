@@ -10,6 +10,8 @@ import (
 	"regexp"
 )
 
+
+
 type TagUnmarshaler interface {
 	UnmarshalField(context.Context, reflect.StructField) error
 }
@@ -55,8 +57,8 @@ type Tag struct {
 	Value       reflect.Value
 	Parent      reflect.Value
 	customState map[string]interface{}
-	index       int
 	Name        string
+	SelectedName    string
 	Default     string
 	Content     string
 	Raw         string
@@ -69,6 +71,7 @@ type Tag struct {
 	handler     TagHandler
 	Skip        bool
 	buffer      bytes.Buffer
+	tag_unmarshaller_opts *tagUnmarshallerOptions
 }
 
 func (t *Tag) Write(p []byte) (n int, err error) {
@@ -86,9 +89,11 @@ func (t *Tag) Read(p []byte) (n int, err error) {
 func (t *Tag) UnmarshalText(text []byte) (err error) {
 	return t.unmarshaler.UnmarshalText(text)
 }
+
 func (t *Tag) GetState() map[string]interface{} {
 	return t.customState
 }
+
 func (t *Tag) GetStateValue(key string) interface{} {
 	return t.customState[key]
 }
@@ -101,37 +106,49 @@ func chainMiddleware(handler TagHandler, middlewares []Middleware) TagHandler {
 	}
 	return handler
 }
+
 func (tag *Tag) UnmarshalField(ctx context.Context, field reflect.StructField) (err error) {
 	tag.FieldType = field.Type.Name()
 	tag.FieldName = field.Name
 	if !tag.Value.IsValid() {
 		return INVALID_FIELD_ERROR
 	}
+	
+
 	ref := tag.Value.Addr().Interface()
 	if custom_text_unmarshaller, ok := ref.(encoding.TextUnmarshaler); ok {
 		tag.useTextUnmarshaller(custom_text_unmarshaller)
 	} else {
 		switch tag.Value.Kind() {
+		//handle the recursive types
 		case reflect.Ptr:
 			tag.useTextUnmarshaller(_pointer(tag.Value))
 		case reflect.Struct:
 			tag.useTextUnmarshaller(_struct(tag.Value))
 		case reflect.Slice:
 			tag.useTextUnmarshaller(_slice(tag.Value))
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			tag.useTextUnmarshaller(_int(tag.Value))
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			tag.useTextUnmarshaller(_uint(tag.Value))
-		case reflect.String:
-			tag.useTextUnmarshaller(_string(tag.Value))
-		case reflect.Bool:
-			tag.useTextUnmarshaller(_boolean(tag.Value))
-		case reflect.Float32, reflect.Float64:
-			tag.useTextUnmarshaller(_float(tag.Value))
+		
 		default:
-			//If the type is not one of these values, then it's likely an interface type and cannot be set
-			//Simply return and ignore the values
-			return
+			// if unmarshaller_opts != nil && !unmarshaller_opts.OverrideValues && !tag.Value.IsZero() {
+			// 		return
+			// }
+			switch tag.Value.Kind() {
+				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+					tag.useTextUnmarshaller(_int(tag.Value))
+				case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+					tag.useTextUnmarshaller(_uint(tag.Value))
+				case reflect.String:
+					tag.useTextUnmarshaller(_string(tag.Value))
+				case reflect.Bool:
+					tag.useTextUnmarshaller(_boolean(tag.Value))
+				case reflect.Float32, reflect.Float64:
+					tag.useTextUnmarshaller(_float(tag.Value))
+				default:
+					//If the type is not one of these values, or the recursive types, then it's likely an interface type and cannot be set
+					//Simply return and ignore the values
+					return
+				}
+			
 		}
 	}
 	var options *Options
@@ -153,15 +170,7 @@ func (t *Tag) Bytes() []byte {
 	return []byte(t.Content)
 }
 
-func (t *Tag) DefaultMiddleware() []Middleware {
-	return []Middleware{
-		WithRequiredTag,
-		WithMatchesTag,
-		WithOptionsTag,
-		WithEnvTag,
-		WithDefaultTag,
-	}
-}
+
 
 func (t *Tag) Push(us ...Middleware) {
 	t.middleware = append(us, t.middleware...)
