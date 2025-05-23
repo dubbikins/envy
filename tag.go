@@ -75,14 +75,10 @@ type Tag struct {
 }
 
 func (t *Tag) Write(p []byte) (n int, err error) {
-	// w.value = p
-	// return len(p), nil
 	return t.buffer.Write(p)
 }
 
 func (t *Tag) Read(p []byte) (n int, err error) {
-	// w.value = p
-	// return len(p), nil
 	return t.buffer.Read(p)
 }
 
@@ -126,12 +122,8 @@ func (tag *Tag) UnmarshalField(ctx context.Context, field reflect.StructField) (
 		case reflect.Struct:
 			tag.useTextUnmarshaller(_struct(tag.Value))
 		case reflect.Slice:
-			tag.useTextUnmarshaller(_slice(tag.Value))
-		
+			tag.useTextUnmarshaller(_slice(tag.Value))	
 		default:
-			// if unmarshaller_opts != nil && !unmarshaller_opts.OverrideValues && !tag.Value.IsZero() {
-			// 		return
-			// }
 			switch tag.Value.Kind() {
 				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 					tag.useTextUnmarshaller(_int(tag.Value))
@@ -148,7 +140,6 @@ func (tag *Tag) UnmarshalField(ctx context.Context, field reflect.StructField) (
 					//Simply return and ignore the values
 					return
 				}
-			
 		}
 	}
 	var options *Options
@@ -175,6 +166,7 @@ func (t *Tag) Bytes() []byte {
 func (t *Tag) Push(us ...Middleware) {
 	t.middleware = append(us, t.middleware...)
 }
+
 func (t *Tag) Contents() string {
 	return fmt.Sprintf(`|*****Tag Details*****|
    StructFieldName: %s
@@ -186,6 +178,7 @@ func (t *Tag) Contents() string {
    Required: %t
 `, t.FieldName, t.FieldType, t.Name, os.Getenv(t.Name), t.Content, t.Raw, t.Required)
 }
+
 func (t *Tag) useTextUnmarshaller(u encoding.TextUnmarshaler) {
 	t.unmarshaler = u
 }
