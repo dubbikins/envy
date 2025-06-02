@@ -1,4 +1,4 @@
-module github.com/dubbikins/envy
+module github.com/dubbikins/envy/v2
 
 go 1.24
 
