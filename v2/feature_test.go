@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/cucumber/godog"
-	"github.com/dubbikins/envy"
+	"github.com/dubbikins/envy/v2"
 	"github.com/google/go-cmp/cmp"
 )
 

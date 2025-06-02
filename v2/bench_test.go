@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dubbikins/envy"
+	"github.com/dubbikins/envy/v2"
 )
 
 type Config struct {
