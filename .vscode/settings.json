@@ -1,5 +1,5 @@
 {
-    "go.coverOnSave": true,
+    "go.coverOnSave": false,
     "go.coverageOptions": "showUncoveredCodeOnly",
     "go.useLanguageServer": true
 }

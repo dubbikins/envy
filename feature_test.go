@@ -166,7 +166,7 @@ type defaultTestStruct struct {
 }
 
 type optionsTestStruct struct {
-	String string `env:"TEST_ENV_STR" options:"a,b,c"`
+	String string `env:"TEST_ENV_STR" options:"a,b,c" secret:"test"`
 	Int    int    `env:"TEST_ENV_INT" options:"[-1,2,3]"`
 	Int8   int8   `env:"TEST_ENV_INT8" options:"{-1,2,3}"`
 	Int16  int16  `env:"TEST_ENV_INT16" options:"(-1,2,3)"`
