@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/dubbikins/envy/v2/envy/ls"
+	"github.com/dubbikins/envy/v2/cmd/envy/ls"
 	"github.com/spf13/cobra"
 )
 
