@@ -9,6 +9,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/cucumber/godog"
 	"github.com/dubbikins/envy"
@@ -503,3 +504,124 @@ func TestNoOverrideOptionSet(t *testing.T) {
 		t.Fatalf("expected no errors, got %v", err)
 	}
 }
+
+func TestUnmarshalSlice(t *testing.T) {
+	type TestSlice struct {
+		Slice []string `env:"TEST_ENV_SLICE" default:"a,b,c"`
+	}
+	example := &TestSlice{}
+	err := envy.Unmarshal(example)
+	if err != nil {
+		t.Fatalf("expected no errors, got %v", err)
+	}
+	expected := &TestSlice{
+		Slice: []string{"a", "b", "c"},
+	}
+	if !cmp.Equal(example, expected) {
+		t.Fatalf("expected %v, got %v", expected, example)
+	}
+}
+
+func TestUnmarshalSlicePrimitives(t *testing.T) {
+	type TestSlice struct {
+		IntSlice []int `env:"TEST_ENV_SLICE" default:"1,2,3,"`
+		FloatSlice []float32`env:"TEST_ENV_SLICE" default:"3,,0.1,1000"`
+		StringSlice []string `env:"TEST_ENV_SLICE" default:"a,b,c"`
+		BoolSlice []bool `env:"TEST_ENV_SLICE" default:"true,false,,true"`
+	}
+	example := &TestSlice{}
+	err := envy.Unmarshal(example)
+	if err != nil {
+		t.Fatalf("expected no errors, got %v", err)
+	}
+	expected := &TestSlice{
+		IntSlice: []int{1,2,3, 0},
+		FloatSlice: []float32{3, 0, 0.1, 1000},
+		StringSlice: []string{"a", "b", "c"},
+		BoolSlice: []bool{true, false,false, true},
+	}
+	if !cmp.Equal(example, expected) {
+		t.Fatalf("expected %v, got %v", expected, example)
+	}
+}
+
+func TestUnmarshalSliceStruct(t *testing.T) {
+	type StructItem struct {
+		Name string `env:"NAME" default:"item"`
+	}
+	type TestSlice struct {
+		Slice []StructItem`env:"TEST_ENV_SLICE" default:"3"`
+		PtrSlice []*StructItem`env:"TEST_ENV_SLICE" default:"3"` // This should be a no-op since pointers are not supported 
+
+	}
+	example := &TestSlice{}
+	err := envy.Unmarshal(example)
+	if err != nil {
+		t.Fatalf("expected no errors, got %v", err)
+	}
+	expected := &TestSlice{
+		Slice: []StructItem{{Name: "item"}, {Name: "item"}, {Name: "item"}},
+		PtrSlice: []*StructItem{},
+	}
+	if !cmp.Equal(example.Slice, expected.Slice) {
+		t.Fatalf("expected %v, got %v", expected, example)
+	}
+	for i, item := range expected.PtrSlice {
+		if item == nil || item.Name != example.PtrSlice[i].Name {
+			t.Fatalf("expected %v, got %v", expected.PtrSlice[i], item)
+		}
+	}
+}
+type StructItem struct {
+		Name string `env:"NAME" default:"item"`
+	}
+	type StructItem2 struct {
+		Name string `env:"NAME" default:"item2"`
+	}
+	func (s StructItem) GetName() string {
+		return s.Name
+	}
+	func (s StructItem2) GetName() string {
+		return s.Name
+	}
+func TestUnmarshalSliceInterface(t *testing.T) {
+	
+	type Intf interface {
+		GetName() string
+	}
+	type TestSlice struct {
+		Slice []Intf`env:"TEST_ENV_SLICE" default:"3"`
+	}
+	example := &TestSlice{}
+	err := envy.Unmarshal(example)
+	if err != nil {
+		t.Fatalf("expected no errors, got %v", err)
+	}
+	
+	if len(example.Slice) != 0 {
+		t.Fatalf("expected empty slice, got %d items", len(example.Slice))
+	}
+}
+
+func TestUnmarshalSliceWithCustomUnmarshal(t *testing.T) {
+	
+	
+	
+	type TestSlice struct {
+		Slice []envy.Duration`env:"TEST_ENV_SLICE" default:"3s,,4s,5s"`
+	}
+	example := &TestSlice{}
+	err := envy.Unmarshal(example)
+	if err != nil {
+		t.Fatalf("expected no errors, got %v", err)
+	}
+	expected := &TestSlice{
+		Slice: []envy.Duration{{Duration: 3 * time.Second}, {}, {Duration: 4 * time.Second}, {Duration: 5 * time.Second}},
+	}
+	if !cmp.Equal(example, expected) {
+		t.Fatalf("expected %v, got %v", expected, example)
+	}
+}
+
+
+
