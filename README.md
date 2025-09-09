@@ -22,8 +22,18 @@ Envy is a Go package that provides a flexible way to unmarshal environment varia
 
 ## Installation:
 
+### CLI
+
+
 ```bash
-go get -u github.com/dubbikins/envy
+go install github.com/dubbikins/envy/v2/cmd/envy@latest
+//or
+go get -tool github.com/dubbikins/envy/v2/cmd/envy@latest
+```
+
+### Go Dependency
+```bash
+go get -u github.com/dubbikins/envy/v2
 ```
 
 ## Basic Usage
