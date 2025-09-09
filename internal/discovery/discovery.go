@@ -138,10 +138,14 @@ func (p *packageExplorer) Walk()  {
 														File: file.Name.String(),
 														Pos: int(field.Tag.Pos()),
 														Type: s.Name.Name,
-														Field: field.Names[0].Name,
-														Tag: field.Tag.Value[1:len(field.Tag.Value)-1],
 														EnvVar: env_var,
 														Location: LinkWithLineNums(pkg)("", field.Tag),
+												}
+												if len(field.Names) > 0 {
+													next_occurence.Field = field.Names[0].Name
+												}
+												if len(field.Tag.Value) >= 1 {
+													next_occurence.Tag = field.Tag.Value[1:len(field.Tag.Value)-1]
 												}
 												var occurences []occurence
 												var exists bool
