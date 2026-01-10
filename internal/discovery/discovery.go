@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -56,7 +57,6 @@ func NewPkgExplorer(optsFn...func(*Config) error) (px *packageExplorer, err erro
 			return
 		}
 	}
-	fmt.Println(px.cfg)
 	return
 }
 
@@ -97,9 +97,148 @@ type occurence struct {
 	EnvVar string
 	MetaTags []string
 }
+func (p *packageExplorer) Vet(env map[string]string)  {
+	slog.Debug("Scanning packages for tag",  "tag", p.cfg.TagName, "and meta tags", p.cfg.MetaTags)
+	var pkgs []*packages.Package
+	var err error
+	if pkgs, err = packages.Load(&packages.Config{
+		Mode:  p.cfg.Mode,
+		Dir:   p.cfg.Dir,
+		Env:  append(os.Environ(), p.cfg.Env...),
+		Tests: p.cfg.Tests,
+	}, p.cfg.DirPattern); err != nil {
+		return
+	}
+
+	if packages.PrintErrors(pkgs) > 0 {
+		os.Exit(1)
+	}
+	var report = map[string] []occurence{}
+	for _, pkg := range pkgs {
+		for _, file := range pkg.Syntax {
+			for _, decl := range file.Decls {
+				switch d := decl.(type) {
+				case *ast.GenDecl:
+					for _, spec := range d.Specs {
+						switch s := spec.(type) {
+						case *ast.TypeSpec:
+							if st, ok := s.Type.(*ast.StructType); ok {
+								for _, field := range st.Fields.List {
+									
+									if field.Tag != nil {
+										
+										var required_tag string
+										var required bool
+										var discover_tag string
+										var ok bool
+										if required_tag, ok = reflect.StructTag(field.Tag.Value[1:len(field.Tag.Value)-1]).Lookup("required"); !ok || required_tag == "" || required_tag == "-" {
+											required = false
+										}else if required, err = strconv.ParseBool(required_tag); err != nil {
+											slog.Error("Parse Required Field", "name", field.Names , "required_tag", required_tag, "error", err)
+											return 
+										}
+										slog.Debug("Field", "name", field.Names , "tag", field.Tag, "required", required)
+										if !required {
+											slog.Debug("Not required, skipping")
+											continue
+										}
+										if discover_tag, ok = reflect.StructTag(field.Tag.Value[1:len(field.Tag.Value)-1]).Lookup(p.cfg.TagName); ok {
+											sanitized_tag := strings.Split(discover_tag,";")
+											if len(sanitized_tag) == 0 {
+												continue
+											}
+											var found bool
+											var occurences []occurence
+											for _, env_var := range strings.Split(sanitized_tag[0], "|") {
+												if _, found = env[env_var]; found {
+													occurences = []occurence{}
+													continue
+												}
+												var next_occurence = occurence{
+														PackagePath: pkg.PkgPath,
+														Package: pkg.Types.Name(),
+														File: file.Name.String(),
+														Pos: int(field.Tag.Pos()),
+														Type: s.Name.Name,
+														EnvVar: env_var,
+														Location: LinkWithLineNums(pkg)("", field.Tag),
+												}
+												if len(field.Names) > 0 {
+													next_occurence.Field = field.Names[0].Name
+												}
+												if len(field.Tag.Value) >= 1 {
+													next_occurence.Tag = field.Tag.Value[1:len(field.Tag.Value)-1]
+												}
+												report[env_var] = append(occurences, next_occurence)
+												
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			
+		}
+	}
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+    t.AppendHeader(table.Row{ "Name",  "Tag", "Location",})
+    t.SetStyle(table.Style{
+        Name: "myNewStyle",
+        Box: table.BoxStyle{
+            BottomLeft:       "",
+            BottomRight:      "",
+            BottomSeparator:  "v",
+            Left:             "",
+            LeftSeparator:    "",
+            MiddleHorizontal: "-",
+            MiddleSeparator:  "+",
+            MiddleVertical:   "|",
+            PaddingLeft:      "  ",
+            PaddingRight:     "  ",
+            Right:            "",
+            RightSeparator:   "",
+            TopLeft:          "",
+            TopRight:         "",
+            TopSeparator:     "v",
+            UnfinishedRow:    " ~~~",
+        },
+        Color: table.ColorOptions{
+            IndexColumn:     text.Colors{text.BgBlack, text.FgWhite},
+            Footer:          text.Colors{text.BgBlack, text.FgWhite},
+            Header:          text.Colors{text.BgBlack, text.FgHiCyan},
+            Row:             text.Colors{text.BgBlack, text.FgHiGreen},
+			Separator: text.Colors{text.BgBlack, text.FgWhite},
+			Border: text.Colors{text.BgBlack, text.FgWhite},
+            // RowAlternate:    text.Colors{text.Bg, text.FgBlack},
+        },
+        Format: table.FormatOptions{
+            Footer: text.FormatUpper,
+            Header: text.FormatUpper,
+            Row:    text.FormatDefault,
+			RowAlign: text.AlignLeft,
+        },
+        Options: table.Options{
+            DrawBorder:      true,
+            SeparateColumns: true,
+            SeparateFooter:  true,
+            SeparateHeader:  true,
+            SeparateRows:    false,
+        },
+    })
+	for env_var, occrs := range report {
+		for _, occ := range occrs {
+			  t.AppendRows([]table.Row{{ env_var, occ.Tag,occ.Location, }})
+		}
+	}
+	t.Render()
+}
 
 func (p *packageExplorer) Walk()  {
-	slog.Info("Loading packages",  "tag", p.cfg.TagName, "and meta tags", p.cfg.MetaTags)
+	slog.Debug("Loading packages",  "tag", p.cfg.TagName, "and meta tags", p.cfg.MetaTags)
 	var pkgs []*packages.Package
 	var err error
 	if pkgs, err = packages.Load(&packages.Config{

@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/dubbikins/envy/v2/cmd/envy/ls"
+	"github.com/dubbikins/envy/v2/cmd/envy/vet"
 	"github.com/spf13/cobra"
 )
 
@@ -14,6 +15,7 @@ var cmd = &cobra.Command{
 
 func main() {
 	ls.Extends(cmd)
+	vet.Extends(cmd)
 	// Add any other commands or flags here if needed
 	cmd.Execute()
 }
