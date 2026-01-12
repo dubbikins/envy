@@ -14,6 +14,13 @@ func LexEnvironmentVariableTag(l text.Lexer[Token]) (next text.StateFn[Token]) {
 	return LexEnvironmentVariableName
 }
 
+func LexDefaultWithTemplate(l text.Lexer[Token]) (next text.StateFn[Token]) {
+	l.AcceptRunFn(IsAny)
+	l.Emit(TokenIdent)
+	
+	return 
+}
+
 
 // ################################ LEXER STATES ################################ 
 
@@ -31,7 +38,9 @@ func IsOptionKeyCharacter (r rune) bool {
 
 
 
-
+func IsAny (r rune) bool {
+	return true
+}
 
 func IsUpperAndLowerLettersDigitsAndUnderscore (r rune) bool {
 	return text.IsUpperOrLower(r) ||  (r >= '0' && r <= '9') || r == '_'
@@ -73,7 +82,6 @@ func LexEnvironmentVariableName(l text.Lexer[Token]) (next text.StateFn[Token]) 
 
 func LexOption(l text.Lexer[Token]) (next text.StateFn[Token]) {
 	if l.Peek() == text.EOF {
-		// l.Emit(EOF)
 		return
 	}
 	//Lex the option key first

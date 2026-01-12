@@ -48,6 +48,10 @@ func WalkContext(ctx context.Context, walkfn WalkFn, s any) (err error) {
 		}
 		err = errors.Join(err, walkfn(curr))
 		for next := range curr.descendants() {
+			if next.Parent() != nil && next.Parent().Value().Kind() == reflect.Struct {
+				slog.Info("Walking", "field", next.Field().Name)
+			}
+			
 			stack = append(stack, &next)
 		}
 	}
