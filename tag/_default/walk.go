@@ -37,11 +37,9 @@ func WalkFn(next tag.WalkFn) tag.WalkFn {
 					slog.Error("default tag template error")
 					return
 				}
-				slog.Info("Unmarshalling Default", "value", node.Value().Interface(), "text", value)
 				if err = node.UnmarshalText([]byte(node.Bytes())); err != nil {
 					return
 				}
-				slog.Info("Unmarshalled Default", "value", node.Value().Interface())
 				return next(node)
 			}
 		}

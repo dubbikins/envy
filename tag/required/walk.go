@@ -47,7 +47,6 @@ func WalkFn(next tag.WalkFn) tag.WalkFn {
 					slog.Error("required tag template error")
 					return
 				}
-				slog.Info("Required Tag", "value", string(node.Bytes()))
 				if _, isRequired := true_values[string(node.Bytes())]; isRequired && node.Value().IsZero() {
 					return tag.ErrRequiredTagIsZero(node)
 				}

@@ -1,7 +1,6 @@
 package env
 
 import (
-	"log/slog"
 	"os"
 	"strings"
 
@@ -88,9 +87,7 @@ func WalkFn(next tag.WalkFn) tag.WalkFn {
 						}
 				}
 				environ_cache[env_source] = environ
-				slog.Info("Using custom env reader", "source", "env_reader_source", "values", environ )
 			}
-			slog.Info("Using custom environ reader")
 			Getenv = func(s string) (string) {
 				var _found bool
 				if s, _found = environ[s]; !_found && osFallback {
@@ -103,13 +100,7 @@ func WalkFn(next tag.WalkFn) tag.WalkFn {
 		
 		for _, envVar := range node.TagValues() {
 			if value = Getenv(envVar); value != "" {
-				slog.Info("Fetching Env Var", envVar, value)
-
 				if expand {
-					// Getenv = func(s string) string {
-					// 	slog.Info("expanding env", "name", s)
-					// 	return 
-					// }
 					value = os.Expand(value, ExpandFn(node, Getenv)) //ExpandFn(node, Getenv)
 				}
 				if  err = node.UnmarshalText([]byte(value)); err != nil {

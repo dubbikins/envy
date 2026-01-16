@@ -7,7 +7,6 @@ import (
 	"encoding"
 	"fmt"
 	"iter"
-	"log/slog"
 	"reflect"
 	"strconv"
 	"strings"
@@ -66,7 +65,6 @@ func (node *Node) Parse(tagName string,  startState text.StateFn[Token]) ( err e
 	if node.Field() == nil {
 		return 
 	}
-	slog.Info("Parsing", "tag", tagName, "field", node.Field().Name)
 	var tagValue, ok = node.Field().Tag.Lookup(tagName)
 	if !ok   {
 		return
@@ -153,12 +151,10 @@ func (node *Node) Parse(tagName string,  startState text.StateFn[Token]) ( err e
 
 func (n *Node) UnmarshalText(text []byte) (err error) {
 	defer n.Reset()
-	//slog.Info("Unmarshaling Text", "type", n.value.Type())
 	if n.value.CanAddr() {
 		var unmarshaler encoding.TextUnmarshaler
 		var implementsUnmarshaler bool
 		if unmarshaler, implementsUnmarshaler = n.value.Addr().Interface().(encoding.TextUnmarshaler); implementsUnmarshaler {
-			//slog.Info("Unmarshaling Text[Custom Unmarshaler]", "type", n.value.Type())
 			return unmarshaler.UnmarshalText(text)
 		}
 	}
@@ -204,12 +200,9 @@ func (n *Node) UnmarshalText(text []byte) (err error) {
 		}
 	case reflect.Slice,reflect.Array:
 		text = bytes.Trim(text, "[{()}]")
-		//slog.Info("Slice Node", "content", n.content.String())
-		// n.Write(text)
 		if len(text) == 0 {
 			return
 		}
-		slog.Info("Unmarshalling slice", "text", string(text))
 		var sep, set = n.options["sep"]
 		if len(sep) > 1 {
 			return fmt.Errorf("invalid separator: limit 1 character")
@@ -286,12 +279,10 @@ func (n *Node) UnmarshalText(text []byte) (err error) {
 
 
 func (n *Node) MarshalText() (text []byte, err error) {
-	//slog.Info("Unmarshaling Text", "type", n.value.Type())
 	if n.value.CanAddr() {
 		var marshaler encoding.TextMarshaler
 		var implementsMarshaler bool
 		if marshaler, implementsMarshaler = n.value.Addr().Interface().(encoding.TextMarshaler); implementsMarshaler {
-			//slog.Info("Unmarshaling Text[Custom Unmarshaler]", "type", n.value.Type())
 			return marshaler.MarshalText()
 		}
 	}
@@ -348,7 +339,6 @@ func (n *Node) structDescendants(yield func(Node) bool) {
 func (n *Node) sliceDescendants(yield func(Node) bool) {
 	var i = 0
 	for i < n.value.Len() {
-		//slog.Info("yielding slice element", "i", i)
 		var descendant = n.Descendant(n.value.Index(i),nil)
 		descendant.position = i
 		if !yield(descendant){break}
@@ -379,7 +369,6 @@ func (n *Node) descendants() iter.Seq[Node] {
 	if n.value.CanAddr() {
 		var implementsTextUnmarshaler bool
 		if _, implementsTextUnmarshaler = n.value.Addr().Interface().(encoding.TextUnmarshaler); implementsTextUnmarshaler {
-			//slog.Info("Unmarshaling Text[Custom Unmarshaler]", "type", n.value.Type())
 			return n.primitiveDescendants
 		}
 	}
