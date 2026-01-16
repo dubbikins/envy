@@ -4,7 +4,6 @@ import (
 	"log/slog"
 
 	"github.com/dubbikins/envy/v2/tag"
-	"github.com/dubbikins/envy/v2/tag/text"
 )
 
 
@@ -15,7 +14,7 @@ func WalkFn( next tag.WalkFn) tag.WalkFn {
 		if node.Field() == nil { 
 			return 
 		}
-		if err = text.Parse("dynamodbav", node, lexTag); err != nil || node.Skipped(){
+		if err = node.Parse("dynamodbav", lexTag); err != nil || node.Skipped(){
 			return 
 		}
 	

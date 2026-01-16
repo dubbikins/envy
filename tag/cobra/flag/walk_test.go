@@ -17,7 +17,7 @@ func TestWalkFlags(t *testing.T) {
 	}
 	var have = &Example{}
 	var err error
-	if err = tag.Walk(tag.Chain(tag.UnmarshalText, TagWalkFn(cmd)), have); err != nil {
+	if err = tag.Walk(tag.Chained(nil, TagWalkFn(cmd)), have); err != nil {
 		t.Fatal(err)
 	}
 }

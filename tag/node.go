@@ -7,10 +7,13 @@ import (
 	"encoding"
 	"fmt"
 	"iter"
+	"log/slog"
 	"reflect"
 	"strconv"
 	"strings"
 	"unsafe"
+
+	"github.com/dubbikins/envy/v2/text"
 )
 
 type Node struct {
@@ -42,7 +45,7 @@ func (n *Node) WithContext(ctx context.Context) *Node {
 	return n2
 }
 
-func (n *Node) SetValueIterator(iter iter.Seq2[int, string]) {
+func (n *Node) SetTagValues(iter iter.Seq2[int, string]) {
 	n.iter = iter
 }
 
@@ -50,7 +53,106 @@ func (n *Node) Context() context.Context {
 	return n.ctx
 }
 
+func (node *Node) Parse(tagName string,  startState text.StateFn[Token]) ( err error) {
+	if startState == nil {
+		err = fmt.Errorf("parse lexing start state cannot be nil")
+	}
+	var values = []string{}
+	node.SetTagValues( func(yield func(int, string) bool) {
+		for i, value := range values {
+			if !yield(i, value) {break}
+		}
+	})
+	if node.Field() == nil {
+		return 
+	}
+	slog.Info("Parsing", "tag", tagName, "field", node.Field().Name)
+	var tagValue, ok = node.Field().Tag.Lookup(tagName)
+	if !ok   {
+		return
+	}
+
+	
+	// if node.lexer == nil {
+	// 	node.lexer = 
+	// }
+	var tokenizer text.Tokenizer[Token] = text.NewLexer(tagValue, startState)
+	var opts bool
+	var token text.Token[Token]
+	loop:
+	for {
+		token, err = tokenizer.NextToken()
+		if err != nil  {
+			return
+		}else if token.ValueFrom(tagValue) == "-" {
+			node.Skip()
+			return
+		}
+		if token.Type == 0{
+			break loop
+		}
+		if !opts {
+			switch token.Type{
+			case TokenIdent:
+				values = append(values, token.ValueFrom(tagValue))
+			case TokenSemiColon:
+				opts = true
+			case TokenPipe:
+				continue
+			case EOF:
+				break
+			default:
+				err = fmt.Errorf("unexpected token type %s with value %s", token.Type, token.ValueFrom(tagValue))
+				return
+			}
+		}else {
+			switch token.Type{
+			case TokenKey:
+				var key text.Token[Token] = token
+				var value text.Token[Token]
+				if token, err = tokenizer.NextToken(); err != nil {
+					return
+				}else if  token.Type!= TokenEquals {
+					err = fmt.Errorf("expected = after item key %s but have %s", key.ValueFrom(tagValue), token.ValueFrom(tagValue))
+					return
+				}
+				if value, err = tokenizer.NextToken(); err != nil {
+					return
+				}else if  value.Type!= TokenValue && value.Type != TokenQuotedValue{
+					err = fmt.Errorf("expected value after key= %s", value.ValueFrom(tagValue))
+					return
+				}
+				if value.Type == TokenQuotedValue {
+					value.Pos.Start +=1
+					value.Pos.End -=1
+				}
+				node.SetOption(key.ValueFrom(tagValue), value.ValueFrom(tagValue))
+				if token, err = tokenizer.NextToken(); err != nil {
+					return
+				}else if token.Type!= TokenComma && token.Type!= EOF{
+					err = fmt.Errorf("expected , or EOF after key=value %s", tagValue[key.Start:token.End])
+					return
+				}
+			case TokenFlag:
+				node.SetFlag(token.ValueFrom(tagValue))
+			case TokenComma:
+				continue
+			case EOF:
+				break loop
+			default:
+				err = fmt.Errorf("exected key or EOF but was %s", token.ValueFrom(tagValue))
+				return
+			}
+		}
+		
+	}
+
+	return
+}
+
+
 func (n *Node) UnmarshalText(text []byte) (err error) {
+	defer n.Reset()
 	//slog.Info("Unmarshaling Text", "type", n.value.Type())
 	if n.value.CanAddr() {
 		var unmarshaler encoding.TextUnmarshaler
@@ -66,6 +168,7 @@ func (n *Node) UnmarshalText(text []byte) (err error) {
 	
 	switch n.value.Kind() {
 	case reflect.Pointer, reflect.Struct:
+		
 	case reflect.Map:
 		if n.value.IsZero() {
 			n.value.Set(reflect.MakeMap(n.value.Type()))
@@ -84,7 +187,7 @@ func (n *Node) UnmarshalText(text []byte) (err error) {
 			n.length = len(text)
 		}
 		
-		for k, v := range n.map_kv_pairs() {
+		for k, v := range n.map_kv_pairs(text) {
 		
 			var key = reflect.Indirect(reflect.New(reflect.TypeOf(n.value.Interface()).Key()))
 			var val = reflect.Indirect(reflect.New(reflect.TypeOf(n.value.Interface()).Elem()))
@@ -103,6 +206,10 @@ func (n *Node) UnmarshalText(text []byte) (err error) {
 		text = bytes.Trim(text, "[{()}]")
 		//slog.Info("Slice Node", "content", n.content.String())
 		// n.Write(text)
+		if len(text) == 0 {
+			return
+		}
+		slog.Info("Unmarshalling slice", "text", string(text))
 		var sep, set = n.options["sep"]
 		if len(sep) > 1 {
 			return fmt.Errorf("invalid separator: limit 1 character")
@@ -125,7 +232,7 @@ func (n *Node) UnmarshalText(text []byte) (err error) {
 			n.value.SetLen(n.length)
 		}
 		var i int
-		for v := range n.slice_element_values() {
+		for v := range n.slice_element_values(text) {
 			var _value = n.Descendant(n.value.Index(i), nil)
 			if err = _value.UnmarshalText(v); err != nil {
 				return
@@ -294,11 +401,11 @@ func (r *Node) Descendant(value reflect.Value, field *reflect.StructField) (Node
 }
 
 
-func (n *Node) slice_element_values() iter.Seq[[]byte] {
+func (n *Node) slice_element_values(text []byte) iter.Seq[[]byte] {
 	if n.value.Kind() != reflect.Slice && n.value.Kind() != reflect.Array{
 		panic("can't get element values on non-slice node")
 	}
-	var scanner = *bufio.NewScanner(bytes.NewReader(n.content.Bytes()))	
+	var scanner = *bufio.NewScanner(bytes.NewReader(text))	
 	scanner.Split(n.slice_element_scanner_splitfn)
 	return func(yield func([]byte) bool) {
 		for scanner.Scan() && yield(scanner.Bytes()) {
@@ -331,11 +438,11 @@ func (n *Node) slice_element_scanner_splitfn(data []byte, atEOF bool) (advance i
 }
 
 
-func (n *Node) map_kv_pairs() iter.Seq2[[]byte,[]byte] {
+func (n *Node) map_kv_pairs(text []byte) iter.Seq2[[]byte,[]byte] {
 	if n.value.Kind() != reflect.Map {
 		panic("can't get kv pairs on non-map node")
 	}
-	var scanner = *bufio.NewScanner(bytes.NewReader(n.content.Bytes()))	
+	var scanner = *bufio.NewScanner(bytes.NewReader(text))	
 	scanner.Split(n.map_kv_scanner_splitfn)
 	return func(yield func([]byte,[]byte) bool) {
 		var key, value string
@@ -402,6 +509,7 @@ func (r *Node) Write(p []byte) (int,error) {
 }
 
 func (r *Node) Reset(){
+	// r.SetValueIterator(nil)
 	r.content.Reset()
 }
 

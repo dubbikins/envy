@@ -1,4 +1,4 @@
-package default_tag
+package _default
 
 import (
 	"testing"

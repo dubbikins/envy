@@ -1,4 +1,4 @@
-package text
+package tag
 
 import (
 	"errors"
@@ -14,7 +14,7 @@ func LexEnvironmentVariableTag(l text.Lexer[Token]) (next text.StateFn[Token]) {
 	return LexEnvironmentVariableName
 }
 
-func LexDefaultWithTemplate(l text.Lexer[Token]) (next text.StateFn[Token]) {
+func LexTemplate(l text.Lexer[Token]) (next text.StateFn[Token]) {
 	l.AcceptRunFn(IsAny)
 	l.Emit(TokenIdent)
 	

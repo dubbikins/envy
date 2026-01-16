@@ -6,6 +6,18 @@ type WalkFn func(node *Node) (err error)
 //func(node *Node) (err error)
 
 
+func (fn WalkFn) Chain(fns ...ChainableWalkFn) WalkFn {
+	var i = len(fns)-1
+	for i >= 0 {
+		if fns[i] == nil {
+			break
+		}
+		fn = fns[i](fn)
+		i--
+	}
+
+	return fn
+}
 //Generic WalkFn for a spefic kind of Walkfn
 type WalkFnOf[Node any] func(node Node) (err error)
 
@@ -18,19 +30,14 @@ type ChainableWalkFn func(next WalkFn) WalkFn
 
 
 /*
-Chain returns chained, the TagWalkFunc derived by either setting chained to walkFn, or applying each [ChainableWalkFn] in chain to the previous value of chained.
+Chained returns chained, the TagWalkFunc derived by either setting chained to walkFn, or applying each [ChainableWalkFn] in chain to the previous value of chained.
 Each function in chain is applied in the reverse order that is provided, that is 
 	Given chain [cw1,cw2,cw3] and walkFn
-	Chain returns cw1(cw2(cw3(walkFn)))
+	Chained returns cw1(cw2(cw3(walkFn)))
 	
 */
-func Chain(walkFn WalkFn, chain ...ChainableWalkFn) (chained WalkFn) {
-	chained = walkFn
-	var i = len(chain)-1
-	for i >= 0 {
-		chained = chain[i](chained)
-		i--
-	}
-	return chained
+func Chained(fns ...ChainableWalkFn) (chained WalkFn) {
+	chained = func(node *Node) (err error) {return nil} //do nothing to end the chain
+	return chained.Chain(fns...)
 }
 

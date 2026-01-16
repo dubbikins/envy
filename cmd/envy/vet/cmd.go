@@ -7,8 +7,8 @@ import (
 	"github.com/dubbikins/envy/v2/internal/discovery"
 	"github.com/dubbikins/envy/v2/internal/types"
 	"github.com/dubbikins/envy/v2/tag"
-	"github.com/dubbikins/envy/v2/tags/cobra/flag"
-	default_tag "github.com/dubbikins/envy/v2/tags/default"
+	"github.com/dubbikins/envy/v2/tag/_default"
+	"github.com/dubbikins/envy/v2/tag/cobra/flag"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +22,7 @@ type options struct {
 var flags = options{}
 
 func init() {
-	if err := tag.Walk(tag.Chain(flag.InitCmd(vet),default_tag.WalkFn, ), &flags); err != nil {
+	if err := tag.Walk(flag.InitCmd(vet).Chain(_default.WalkFn,), &flags); err != nil {
 		panic(err) 
 	}
 }

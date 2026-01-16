@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dubbikins/envy/v2/tag"
-	"github.com/dubbikins/envy/v2/tags/env"
 	"github.com/dubbikins/envy/v2/types"
 )
 
@@ -31,6 +29,7 @@ func TestUnmarshalStruct(t *testing.T) {
 		Complex64 complex64 `env:"COMPLEX64"`
 		Complex128 complex128 `env:"COMPLEX128"`
 		SkippedFieldWithEmptyFlags string `env:""`
+		Required string `env:"REQUIRED" required:"true"`
 		unexported string //should skip and be ok
 	}
 
@@ -47,6 +46,7 @@ func TestUnmarshalStruct(t *testing.T) {
 				Float32: 12345.6789,
 				Bool: true,
 				Complex64: 1 + 2i,
+				Required: "set",
 			},
 			setEnv: func(t *testing.T, tc ComparableTestCase[Example]) {
 				t.Setenv("STR", tc.want.String)
@@ -58,7 +58,7 @@ func TestUnmarshalStruct(t *testing.T) {
 				t.Setenv("BOOL", fmt.Sprintf("%t", tc.want.Bool))
 				t.Setenv("COMPLEX64", fmt.Sprintf("%v", tc.want.Complex64))
 				t.Setenv("COMPLEX128", fmt.Sprintf("%v", tc.want.Complex128))
-				
+				t.Setenv("REQUIRED", "set")
 			},
 		},
 		{
@@ -66,9 +66,23 @@ func TestUnmarshalStruct(t *testing.T) {
 			have: &Example{},
 			want: &Example{
 				Bool: true,
+				Required: "set",
 			},
 			setEnv: func(t *testing.T, tc ComparableTestCase[Example]) {
 				t.Setenv("BOOL", "yes")
+				t.Setenv("REQUIRED", "set")
+			},
+		},
+		{
+			name: "Missing Required Field",
+			have: &Example{},
+			want: &Example{
+			
+			},
+			expectedAnyError: true ,
+			setEnv: func(t *testing.T, tc ComparableTestCase[Example]) {
+		
+				
 			},
 		},
 		// {
@@ -104,7 +118,7 @@ func TestUnmarshalStructWithStringSliceField(t *testing.T) {
 	//SETUP
 	
 	type Example struct {
-		SliceOfStrings []string `env:"STR"`
+		SliceOfStrings []string `default:"test" env:"STR;sep=','"`
 	}
 
 	var test_cases = StructSliceTestCases[Example] {
@@ -116,7 +130,7 @@ func TestUnmarshalStructWithStringSliceField(t *testing.T) {
 			},
 			setEnv: func(t *testing.T, tc NonComparableTestCase[Example]) {
 				t.Setenv("STR", strings.Join(tc.want.SliceOfStrings, ","))
-				t.Setenv("BYTES", "foobar")
+				// t.Setenv("BYTES", "foobar")
 			},
 		},
 	}
@@ -249,7 +263,7 @@ func TestUnmarshalWithMapStringStringField(t *testing.T) {
 		},
 	}
 
-	if err := tag.Walk(tag.Chain(tag.UnmarshalText, env.WalkFn), have); err != nil {
+	if err := Unmarshal(  have); err != nil {
 		t.Fatal(err)
 	}
 	
@@ -278,7 +292,7 @@ func TestUnmarshalWithMapStringIntField(t *testing.T) {
 		},
 	}
 
-	if err := tag.Walk(tag.Chain(tag.UnmarshalText, env.WalkFn), have); err != nil {
+	if err := Unmarshal( have); err != nil {
 		t.Fatal(err)
 	}
 	
@@ -292,10 +306,10 @@ func TestUnmarshalWithMapStringIntField(t *testing.T) {
 
 func TestCustomReader(t *testing.T) {
 	type Example struct {
-		FOO string `env:"FOO;.env=./tags/env/foo.env,expand"`
-		BAR string `env:"BAR;.env=./tags/env/foo.env,expand"`
-		FOOBAR string `env:"FOOBAR;.env=./tags/env/foo.env,expand"`
-		FOOBAZ string `env:"FOOBAZ;.env=./tags/env/foo.env,expand"`
+		FOO string `env:"FOO;.env=./tag/env/foo.env,expand"`
+		BAR string `env:"BAR;.env=./tag/env/foo.env,expand"`
+		FOOBAR string `env:"FOOBAR;.env=./tag/env/foo.env,expand"`
+		FOOBAZ string `env:"FOOBAZ;.env=./tag/env/foo.env,expand"`
 	}
 	have := &Example{}
 	want := &Example{
@@ -304,7 +318,7 @@ func TestCustomReader(t *testing.T) {
 		FOOBAR: "FOOBAR",
 		FOOBAZ: "FOOBAZ", 
 	}
-	if err := tag.Walk(tag.Chain(tag.UnmarshalText, env.WalkFn), have); err != nil {
+	if err := Unmarshal(  have); err != nil {
 		t.Fatal(err)
 	}
 	if *have != *want {
@@ -393,7 +407,7 @@ type TextUnmarshalerExample struct {
 func (t *TextUnmarshalerExample) UnmarshalText(data []byte) (err error) {
 	parts := bytes.Split(data, []byte(","))
 	t.Name = string(parts[0])
-
+	
 	return
 }
 func TestUnmarshalStructTextUnmarshalerFields(t *testing.T) {
@@ -411,25 +425,27 @@ func TestUnmarshalStructTextUnmarshalerFields(t *testing.T) {
 			want: &Example{},
 			setEnv: func(t *testing.T, tc NonComparableTestCase[Example]) {},
 		},
-		// {
-		// 	name: "TextUnmarshalerExample",
-		// 	have: &Example{},
-		// 	want: &Example{
-		// 		SLICE_TEXT_UNMARSHALER: []*TextUnmarshalerExample{
-		// 			{
-		// 				Name: "Rob Pike",
-		// 				Age: 69, //lol (true as of writing this in Sep 2025)
-		// 			},
-		// 		},
-		// 	},
-		// 	setEnv: func(t *testing.T, tc NonComparableTestCase[Example]) {
-		// 		t.Setenv("SLICE_STRING", "Rob Pike,69")
-		// 	},
-		// },
+		{
+			name: "Empty TextUnmarshalerExample",
+			have: &Example{},
+			want: &Example{
+				SLICE_TEXT_UNMARSHALER: []*TextUnmarshalerExample{
+					{
+						Name:"JOE",
+					},
+					{
+						Name:"BOB",
+					},
+				},
+			},
+			setEnv: func(t *testing.T, tc NonComparableTestCase[Example]) {
+				t.Setenv("SLICE_STRING", "JOE|1,BOB|2")
+			},
+		},
 	}
 	test_cases.Run(t, func(t *testing.T, have, want Example) {
 		if len(have.SLICE_TEXT_UNMARSHALER) != len(want.SLICE_TEXT_UNMARSHALER) {
-			t.Fatalf("expected SLICE_STRING to have length '%d' but got '%d'", len(want.SLICE_TEXT_UNMARSHALER), len(have.SLICE_TEXT_UNMARSHALER))
+			t.Fatalf("expected SLICE_STRING to have length '%d' but got '%d' with value '%v'", len(want.SLICE_TEXT_UNMARSHALER), len(have.SLICE_TEXT_UNMARSHALER), have.SLICE_TEXT_UNMARSHALER)
 		}
 		// for i := range want.SLICE_STRING {
 		// 	if want.SLICE_STRING[i] != have.SLICE_STRING[i] {
@@ -451,6 +467,8 @@ type ComparableTestCase[T any] struct {
 		name string
 		have *T
 		want *T
+		expectedAnyError bool
+		expectedError error
 		setEnv func (*testing.T, ComparableTestCase[T])
 }
 
@@ -462,8 +480,22 @@ func (test_cases StructTestCases[T]) Run(_T *testing.T) {
 			if tc.setEnv != nil {
 				tc.setEnv(t, tc)
 			}
-			if err := tag.Walk(tag.Chain(tag.UnmarshalText, env.WalkFn), tc.have); err != nil {
-				t.Fatal(err)
+			if err := Unmarshal( tc.have); err != nil {
+				if tc.expectedAnyError {
+					slog.Debug("Expected any error")
+					return
+				} else if tc.expectedError != nil && errors.Is(err, tc.expectedError) {
+					slog.Info("Matched expected error")
+					return 
+				}else if tc.expectedError != nil && !errors.Is(err, tc.expectedError) {
+					t.Fatalf("expected err %s but got %s", tc.expectedError, err)
+				} else {
+					t.Fatal(err)
+				}
+			} else if tc.expectedAnyError {
+				t.Fatalf("Expected any err but error was nil")
+			} else if tc.expectedError != nil {
+				t.Fatalf("expected err %s but was nil", tc.expectedError)
 			}
 			if *tc.have != *tc.want {
 				t.Fatalf("[%s] expected %v but was %v",tc.name, *tc.want, *tc.have)
@@ -478,6 +510,7 @@ type NonComparableTestCase[T any] struct {
 		name string
 		have *T
 		want *T
+		expectedAnyError bool
 		expectedError error
 		setEnv func (*testing.T, NonComparableTestCase[T])
 }
@@ -490,8 +523,11 @@ func (test_cases StructSliceTestCases[T]) Run(_T *testing.T, assert func(t *test
 			if tc.setEnv != nil {
 				tc.setEnv(t, tc)
 			}
-			if err := tag.Walk(tag.Chain(tag.UnmarshalText, env.WalkFn), tc.have); err != nil {
-				if tc.expectedError != nil && errors.Is(err, tc.expectedError) {
+			if err := Unmarshal(tc.have); err != nil {
+				if tc.expectedAnyError {
+					slog.Debug("Expected any error")
+					return
+				} else if tc.expectedError != nil && errors.Is(err, tc.expectedError) {
 					slog.Info("Matched expected error")
 					return 
 				}else if tc.expectedError != nil && !errors.Is(err, tc.expectedError) {
@@ -530,7 +566,7 @@ func TestSimpleExample(t *testing.T) {
 		// Float32: 123.123,
 		// Float64: 123.123,
 	}
-	err := tag.Walk(tag.Chain(tag.UnmarshalText, env.WalkFn), &have)
+	err := Unmarshal(&have)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -548,7 +584,7 @@ func TestArrayFields(t *testing.T) {
 	want := Example{
 		StrArray: [3]string{"1", "2", "3"},
 	}
-	err := tag.Walk(tag.Chain(tag.UnmarshalText, env.WalkFn), &have)
+	err := Unmarshal( &have)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -566,7 +602,7 @@ func TestArrayFieldErrorsWhenNotEnoughValues(t *testing.T) {
 		StrArray [3]string `env:"STR_ARRAY"`
 	}
 	have := Example{}
-	err := tag.Walk(tag.Chain(tag.UnmarshalText, env.WalkFn), &have)
+	err := Unmarshal(&have)
 	expected_err := "cannot unpack 4 values into array of length 3" //\nreflect: array index out of range
 	if err == nil {
 		t.Fatalf("expected unmarshal to recover from panic and return an error")
@@ -599,7 +635,7 @@ func TestStringSlice(t *testing.T) {
 
 		// DurationSlice: []Duration{{time.Second},{time.Second*2}, {time.Second*3}},
 	}
-	err := tag.Walk(tag.Chain(tag.UnmarshalText, env.WalkFn),&have)
+	err := Unmarshal(&have)
 	if err != nil {
 		t.Fatal(err)
 	}

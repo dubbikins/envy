@@ -1,15 +1,15 @@
-package dynamodb
+package flag
 
 import (
 	"fmt"
 
-	tag_text "github.com/dubbikins/envy/v2/tag/text"
+	"github.com/dubbikins/envy/v2/tag"
 	"github.com/dubbikins/envy/v2/text"
 )
 
 
-func lexTag(l text.Lexer[tag_text.Token]) (next text.StateFn[tag_text.Token]) {
-	return LexPathKey
+func LexTag(l text.Lexer[tag.Token]) (next text.StateFn[tag.Token]) {
+	return LexFlagName
 }
 
 
@@ -21,24 +21,24 @@ func PathCharacters (r rune) bool {
 }
 
 
-func LexPathKey(l text.Lexer[tag_text.Token]) (next text.StateFn[tag_text.Token]) {
+func LexFlagName(l text.Lexer[tag.Token]) (next text.StateFn[tag.Token]) {
 	l.AcceptRun(" ")
 	l.Ignore()
 	if l.AcceptRune('-'){
-		l.Emit(tag_text.TokenIdent)
+		l.Emit(tag.TokenIdent)
 		return nil
 	}
 	l.AcceptRunFn(PathCharacters)
 	if l.HasBufferedText() {
-		l.Emit(tag_text.TokenIdent)
+		l.Emit(tag.TokenIdent)
 	}
 	l.AcceptRun(" ")
 	l.Ignore()
 	switch l.Peek() {
 	case ';':
-		return tag_text.LexSemiColon
+		return tag.LexSemiColon
 	case '|':
-		return tag_text.LexPipe
+		return tag.LexPipe
 	case text.EOF :
 		// l.Emit(EOF)
 	default:

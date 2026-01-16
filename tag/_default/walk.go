@@ -1,4 +1,4 @@
-package default_tag
+package _default
 
 import (
 	"log/slog"
@@ -6,7 +6,6 @@ import (
 	"text/template"
 
 	"github.com/dubbikins/envy/v2/tag"
-	"github.com/dubbikins/envy/v2/tag/text"
 )
 
 var TemplateFunctions = template.FuncMap{
@@ -18,14 +17,18 @@ var TemplateFunctions = template.FuncMap{
 
 func WalkFn(next tag.WalkFn) tag.WalkFn {
 	return func(node *tag.Node) (err error) {
+		if !node.Value().IsZero() {
+			return next(node)
+		}
 		if node.Field() == nil { 
 			return 
 		}
-		if err = text.Parse("default", node, text.LexDefaultWithTemplate); err != nil || node.Skipped(){
+		if err = node.Parse("default", tag.LexTemplate); err != nil || node.Skipped(){
 			return 
 		}
 		for _, value := range node.TagValues() {
 			if value != "" {
+				
 				var _tmpl = template.New("default").Funcs(TemplateFunctions)
 				if _tmpl, err = _tmpl.Parse(value); err != nil {
 					return
@@ -34,9 +37,11 @@ func WalkFn(next tag.WalkFn) tag.WalkFn {
 					slog.Error("default tag template error")
 					return
 				}
+				slog.Info("Unmarshalling Default", "value", node.Value().Interface(), "text", value)
 				if err = node.UnmarshalText([]byte(node.Bytes())); err != nil {
 					return
 				}
+				slog.Info("Unmarshalled Default", "value", node.Value().Interface())
 				return next(node)
 			}
 		}

@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/dubbikins/envy/v2/tag"
-	"github.com/dubbikins/envy/v2/tag/text"
 )
 var environ_cache = map[string] map[string]string{}
 /*
@@ -55,7 +54,7 @@ func WalkFn(next tag.WalkFn) tag.WalkFn {
 			return 
 		}
 		var value string
-		if err = text.Parse("env", node, text.LexEnvironmentVariableTag); err != nil || node.Skipped(){
+		if err = node.Parse("env", tag.LexEnvironmentVariableTag); err != nil || node.Skipped(){
 			return 
 		}
 		var Getenv Reader = os.Getenv
@@ -91,7 +90,7 @@ func WalkFn(next tag.WalkFn) tag.WalkFn {
 				environ_cache[env_source] = environ
 				slog.Info("Using custom env reader", "source", "env_reader_source", "values", environ )
 			}
-			
+			slog.Info("Using custom environ reader")
 			Getenv = func(s string) (string) {
 				var _found bool
 				if s, _found = environ[s]; !_found && osFallback {
@@ -104,6 +103,8 @@ func WalkFn(next tag.WalkFn) tag.WalkFn {
 		
 		for _, envVar := range node.TagValues() {
 			if value = Getenv(envVar); value != "" {
+				slog.Info("Fetching Env Var", envVar, value)
+
 				if expand {
 					// Getenv = func(s string) string {
 					// 	slog.Info("expanding env", "name", s)
@@ -111,12 +112,13 @@ func WalkFn(next tag.WalkFn) tag.WalkFn {
 					// }
 					value = os.Expand(value, ExpandFn(node, Getenv)) //ExpandFn(node, Getenv)
 				}
-				if _, err = node.Write([]byte(value)); err != nil {
+				if  err = node.UnmarshalText([]byte(value)); err != nil {
 					return
 				}
 				break
 			}
 		}
+		node.Reset()
 		return next(node)
 	}
 }

@@ -25,7 +25,7 @@ func TestSliceElementValues(t *testing.T) {
 	}
 	var want_elements = []string{"1", "2", "3"}
 	var i int
-	for elem := range n.slice_element_values() {
+	for elem := range n.slice_element_values([]byte("1,2,3")) {
 		if string(elem) != want_elements[i] {
 			t.Fatalf("expected element[%d] to be '%s' but was '%s'", i, want_elements[i], string(elem))
 		}

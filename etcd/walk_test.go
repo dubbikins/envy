@@ -62,7 +62,7 @@ func TestWalk(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-watcherUpdates
-	if err := tag.WalkContext(t.Context(), tag.Chain(tag.UnmarshalText, WalkFn), &have); err != nil {
+	if err := tag.WalkContext(t.Context(), tag.Chained(WalkFn), &have); err != nil {
 		t.Fatal(err)
 	}
 	if have != want {
@@ -122,7 +122,7 @@ func TestWatchWalk(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-watcherUpdates
-	if err := tag.WalkContext(context.WithValue(t.Context(), _updatesCtxKey, callback), tag.Chain(func (n *tag.Node) ( error) {return nil}, WatchWalkFn), &have); err != nil {
+	if err := tag.WalkContext(context.WithValue(t.Context(), _updatesCtxKey, callback), tag.Chained(WatchWalkFn), &have); err != nil {
 		t.Fatal(err)
 	}
 	if have != want {

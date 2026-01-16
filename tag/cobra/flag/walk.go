@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/dubbikins/envy/v2/tag"
-	"github.com/dubbikins/envy/v2/tag/text"
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +32,7 @@ func TagWalkFn(cmd *cobra.Command) func(next tag.WalkFn) tag.WalkFn {
 		if node.Field() == nil {
 			return 
 		}
-		if err = text.Parse(TAGNAME, node, LexTag); err != nil {
+		if err = node.Parse(TAGNAME, LexTag); err != nil {
 			return
 		}
 		return next(node)
@@ -47,7 +46,8 @@ func InitCmd(cmd *cobra.Command) tag.WalkFn {
 		if node.Field() == nil {
 			return 
 		}
-		if err = text.Parse(TAGNAME, node, LexTag); err != nil || node.Skipped() {
+		
+		if err = node.Parse(TAGNAME, LexTag); err != nil || node.Skipped() {
 			return
 		}
 		var name, shorthand, usage string

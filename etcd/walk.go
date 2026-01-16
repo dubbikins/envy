@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/dubbikins/envy/v2/tag"
-	"github.com/dubbikins/envy/v2/tag/text"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
@@ -23,7 +22,7 @@ func WalkFn( next tag.WalkFn) tag.WalkFn {
 		if node.Field() == nil { //&& node.Value().Kind() != reflect.Pointer
 			return 
 		}
-		if err = text.Parse("etcd", node, LexEctdTag); err != nil || node.Skipped(){
+		if err = node.Parse("etcd", LexEctdTag); err != nil || node.Skipped(){
 			return 
 		}
 		var endpoints []string 
@@ -50,6 +49,9 @@ func WalkFn( next tag.WalkFn) tag.WalkFn {
 				node.Write(kv.Value)
 			}
 		}
+		if err = node.UnmarshalText(node.Bytes()); err != nil {
+			return
+		}
 		return next(node)
 	}
 }
@@ -68,7 +70,7 @@ func WatchWalkFn( next tag.WalkFn) tag.WalkFn {
 		if node.Field() == nil { //&& node.Value().Kind() != reflect.Pointer
 			return 
 		}
-		if err = text.Parse("etcd", node, LexEctdTag); err != nil || node.Skipped(){
+		if err = node.Parse("etcd", LexEctdTag); err != nil || node.Skipped(){
 			return 
 		}
 		var endpoints []string 
